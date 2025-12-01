@@ -1,0 +1,19 @@
+[toolchain]
+anchor_version = "0.30.1"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.devnet]
+solana_direct = "D1f3iNgSM3rBUysBvXWZZNxaC78ApKQptNKQh9KDkxbr"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha --require ts-node/register 'tests/**/*.ts'"

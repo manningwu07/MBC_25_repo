@@ -1,0 +1,14 @@
+/Users/manningwu/Desktop/personalRepos/solana-direct/anchor/target/debug/deps/serde-ec96e336ed3460a5.d: /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/manningwu/Desktop/personalRepos/solana-direct/anchor/target/debug/build/serde-2f295a1a4f0b8388/out/private.rs
+
+/Users/manningwu/Desktop/personalRepos/solana-direct/anchor/target/debug/deps/libserde-ec96e336ed3460a5.rlib: /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/manningwu/Desktop/personalRepos/solana-direct/anchor/target/debug/build/serde-2f295a1a4f0b8388/out/private.rs
+
+/Users/manningwu/Desktop/personalRepos/solana-direct/anchor/target/debug/deps/libserde-ec96e336ed3460a5.rmeta: /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/manningwu/Desktop/personalRepos/solana-direct/anchor/target/debug/build/serde-2f295a1a4f0b8388/out/private.rs
+
+/Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/Users/manningwu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/Users/manningwu/Desktop/personalRepos/solana-direct/anchor/target/debug/build/serde-2f295a1a4f0b8388/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/manningwu/Desktop/personalRepos/solana-direct/anchor/target/debug/build/serde-2f295a1a4f0b8388/out

@@ -1,0 +1,10 @@
+/Users/manningwu/Desktop/personalRepos/solana-direct/anchor/target/release/deps/libversion_check-8bc45ebb51626ea7.rmeta: /Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/lib.rs /Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/version.rs /Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/channel.rs /Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/date.rs
+
+/Users/manningwu/Desktop/personalRepos/solana-direct/anchor/target/release/deps/libversion_check-8bc45ebb51626ea7.rlib: /Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/lib.rs /Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/version.rs /Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/channel.rs /Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/date.rs
+
+/Users/manningwu/Desktop/personalRepos/solana-direct/anchor/target/release/deps/version_check-8bc45ebb51626ea7.d: /Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/lib.rs /Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/version.rs /Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/channel.rs /Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/date.rs
+
+/Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/lib.rs:
+/Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/version.rs:
+/Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/channel.rs:
+/Users/manningwu/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.5/src/date.rs:

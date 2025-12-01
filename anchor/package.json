@@ -1,0 +1,13 @@
+{
+  "name": "@solana-direct/anchor",
+  "version": "0.1.0",
+  "description": "Anchor program for SolanaDirect",
+  "main": "dist/cjs/index.js",
+  "types": "dist/types/index.d.ts",
+  "private": true,
+  "scripts": {
+    "build": "anchor build",
+    "test": "anchor test",
+    "deploy": "anchor deploy --provider.cluster devnet"
+  }
+}
