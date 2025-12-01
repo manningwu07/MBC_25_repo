@@ -1,14 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { usePrivy } from '@privy-io/react-auth';
 import { useState, useCallback, useEffect } from 'react';
 import { Shield, Activity, Coins, Loader2 } from 'lucide-react';
 import { Button } from '~/components/ui/button';
-import { getFundState } from '~/lib/solana/client';
+import { getPoolSol } from '~/lib/solana/client';
 import { LiveMap } from '~/components/dashboard/live-map';
 import { TransactionFeed } from '~/components/dashboard/transaction-feed';
-
-const FUND_ADDRESS = "BuP7...MockAddress";
 
 export default function Home() {
   const { login, authenticated, user, logout } = usePrivy();
@@ -18,26 +17,24 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [fundError, setFundError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const result = await getFundState(FUND_ADDRESS);
-      
-      result.match(
-        (data) => {
-          setTotalRaised(data.totalRaised);
-          setFundError(null);
-        },
-        (error) => {
-          console.warn("Chain not reachable, using mock data:", error.message);
-          setTotalRaised(12450.5);
-        }
-      );
-    };
-
-    fetchData();
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
+  const refreshTvl = useCallback(async () => {
+    try {
+      const tvl = await getPoolSol();
+      setTotalRaised(tvl);
+      setFundError(null);
+    } catch (e: any) {
+      console.warn("TVL fetch failed, using mock:", e?.message);
+      setTotalRaised(12450.5);
+      setFundError(e?.message ?? "TVL fetch failed");
+    }
   }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refreshTvl();
+    const id = setInterval(() => void refreshTvl(), 10000);
+    return () => clearInterval(id);
+  }, [refreshTvl]);
 
   const handleDonate = useCallback(async () => {
     if (!amount || isNaN(Number(amount))) return;

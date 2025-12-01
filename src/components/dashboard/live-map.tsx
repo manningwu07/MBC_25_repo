@@ -1,70 +1,88 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React from 'react';
-import { motion } from 'framer-motion';
+import dynamic from 'next/dynamic';
+import { useEffect, useMemo, useRef } from 'react';
 import { Zap } from 'lucide-react';
 
-const ACTIVE_ZONES = [
-  { name: 'Sudan Relief', lat: 15.0, lng: 30.0 },
-  { name: 'Turkey Quake', lat: 39.0, lng: 35.0 },
-  { name: 'Ukraine Aid', lat: 49.0, lng: 31.0 },
+const Globe: any = dynamic(() => import('react-globe.gl'), { ssr: false }) as any;
+
+const ZONES = [
+  { name: 'Sudan Relief', lat: 15, lng: 30 },
+  { name: 'Turkey Quake', lat: 39, lng: 35 },
+  { name: 'Ukraine Aid', lat: 49, lng: 31 },
   { name: 'Gaza Strip', lat: 31.5, lng: 34.5 },
 ];
 
 export function LiveMap() {
+  const globeRef = useRef<any>(null);
+  const points = useMemo(
+    () =>
+      ZONES.map((z) => ({
+        ...z,
+        size: 0.45,
+        color: '#14f195',
+        label: z.name,
+      })),
+    []
+  );
+
+  useEffect(() => {
+    const g = globeRef.current;
+    if (!g) return;
+    const ctrl = g.controls();
+    if (ctrl) {
+      ctrl.autoRotate = true;
+      ctrl.autoRotateSpeed = 0.45;
+      ctrl.enableZoom = false;
+    }
+    g.pointOfView({ lat: 20, lng: 20, altitude: 2.3 }, 1000);
+  }, []);
+
   return (
-    <div className="w-full h-[400px] overflow-hidden rounded-3xl bg-[#080808] border border-white/10 relative group">
-      {/* Header */}
+    <div className="w-full h-[400px] overflow-hidden rounded-3xl bg-[#080808] border border-white/10 relative">
       <div className="absolute top-4 left-6 z-20">
         <h3 className="text-white font-bold flex items-center gap-2 bg-black/50 px-3 py-1 rounded-full backdrop-blur-md border border-white/10">
           <span className="w-2 h-2 bg-brand-green rounded-full animate-pulse shadow-[0_0_10px_#14f195]" />
           Active Zones
         </h3>
       </div>
-
-      {/* World Map SVG */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-30 grayscale transition-opacity duration-500 group-hover:opacity-50">
-         <svg viewBox="0 0 1000 500" className="w-full h-full fill-[#333]">
-           <path d="M836,155c-4-1-8-2-12-2s-10,3-14,6c-1,1-2,2-3,2c-2,0-3-4-5-5c-2-2-4-2-7-1c-2,1-4,1-7-1 c-1-1-2-2-3-3c-4-3-10-1-12,5c-2,4-3,6-6,7c-5,1-9-4-11-8c-2-3-2-7-1-10c1-2,1-5-2-7c-1-1-3-2-5-2c-1,0-2,1-3,2c-1,1-2,2-4,2 c-2,1-5,0-8-1c-3-2-6,0-8,3c-1,1-3,2-6,1c-2-1-4-3-6-3c-1,0-2-1-2-2c-1-3-2-6-4-8c-2-2-4-3-7-3c-1,0-2,1-2,2c0,3-3,5-6,5 c-1,0-3,0-5-1c-2-1-4-2-6-3c-1-1-2-1-3,0c-1,1-2,2-4,2c-2,1-4,1-6,0c-3-1-5-1-6,1c-1,2-1,5-1,8c0,2-1,4-3,5c-2,1-4,2-7,2 c-2,0-3-2-3-4c0-2-2-3-5-3c-2,0-5,1-7,4c-1,2-3,3-5,4c-2,1-4,1-6,1c-2,0-4-1-6-2c-2-1-3-2-5-2c-1,0-3,0-4,1c-2,1-4,2-6,3 c-2,1-4,1-7,0c-1,0-2-1-3-2c-2-2-4-3-7-3c-1,0-3,1-4,3c-1,1-2,2-3,2c-3,0-5-3-6-5c-1-2-2-4-4-5c-2-1-4-2-7-2c-2,0-3,2-3,4 c0,1-1,3-3,3c-1,0-3-1-5-3c-1-1-2-3-3-4c-1-2-2-3-4-3c-1,0-2,1-3,2c-1,1-2,2-4,2c-2,0-4-2-6-4c-1-2-3-3-5-4c-1-1-3-2-5-2 c-2,0-3,1-5,2c-2,1-4,1-7,1c-1,0-3-1-4-2c-1-1-3-2-5-3c-2-1-4-1-6-1c-1,0-3,1-4,3c-1,1-2,3-3,4c-2,1-5,2-8,2c-1,0-3-1-4-2 c-1-2-2-4-3-5c-2-2-4-2-7-1c-1,0-2,1-3,2c-1,1-2,3-3,4c-1,1-3,2-6,2c-1,0-2-1-3-2c-1-1-2-2-4-2c-2,1-4,2-6,3c-2,1-4,1-7-1 c-1-1-3-2-5-3c-2-1-4-1-6,0c-2,1-3,3-4,5c-1,1-2,3-3,4c-2,1-4,2-7,2c-1,0-3-1-4-3c-1-1-2-3-3-4c-2-1-4-2-6-2c-2,0-3,2-4,4 c-1,1-2,3-3,4c-2,1-4,2-7,2c-2,0-3-2-4-4c-1-1-2-2-3-3c-1-1-3-2-5-2c-1,0-2,1-3,2c-1,1-2,2-4,3c-1,1-2,2-4,2c-2,0-3-2-4-4 c-1-1-2-2-3-3c-2-1-4-1-6,0c-2,1-3,3-4,5c-1,1-2,2-4,3c-2,1-4,1-6,0c-2-1-3-3-5-4c-1-1-3-2-5-2c-2,0-3,1-4,3c-1,1-2,2-4,2 c-2,0-3-2-4-4c-1-2-3-3-5-4c-2-1-4-1-6,0c-1,1-3,2-5,3c-1,1-2,1-4,0c-2-1-4-2-6-3c-2-1-4-1-6,0c-2,1-3,3-4,5c-1,1-2,2-4,3 c-2,1-4,1-6,0c-1-1-3-2-4-3c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,2c-1,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,2 c-1,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,3c-1,1-2,2-4,2c-2,0-3-1-5-2c-1-1-2-2-4-2c-2,0-3,1-4,3c-1,1-2,2-4,2c-2,0-3-1-4-3 c-1-1-2-3-3-4c-2-1-4-2-6-2c-2,0-3,1-4,3c-1,1-2,3-3,4c-2,1-4,2-6,2c-2,0-3-1-5-2c-1-1-2-2-4-2c-2,0-3,1-4,3c-1,1-2,2-4,2 c-2,0-3-1-4-3c-1-1-2-2-3-3c-2-1-4-1-6,0c-2,1-3,3-4,5c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2 c-1,1-2,2-4,3c-2,1-3,1-5,1c-1,0-3-1-4-2c-1-1-2-2-4-3c-2-1-4-1-6,0c-1,1-3,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2 c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2 c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1 c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3 c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2 c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2 c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2 c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1 c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3 c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2 c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2 c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2 c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1 c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3 c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2 c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2 c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2 c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1 c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3 c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2 c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2 c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2 c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1 c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3 c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2 c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2 c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2 c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1 c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3 c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2 c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2 c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2c-1-1-2-2-4-2c-2,0-3,1-5,2c-1,1-2,2-4,3c-1,1-2,1-4,1c-2,0-3-1-4-2" />
-         </svg>
-      </div>
-
-      {/* Grid Overlay */}
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
-      
-      {/* Active Points */}
-      <div className="absolute inset-0">
-        {ACTIVE_ZONES.map((zone, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-3 h-3 bg-brand-green rounded-full shadow-[0_0_15px_#14f195]"
-            style={{
-              // Simple Mercator Projection math
-              left: `${((zone.lng + 180) / 360) * 100}%`,
-              top: `${((-zone.lat + 90) / 180) * 100}%`,
-            }}
-            initial={{ scale: 0 }}
-            animate={{ scale: [1, 1.5, 1] }}
-            transition={{ duration: 2, repeat: Infinity, delay: i * 0.5 }}
-          >
-            <div className="absolute -inset-4 bg-brand-green/20 rounded-full animate-ping" />
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Footer Info */}
-      <div className="absolute bottom-0 inset-x-0 p-4 border-t border-white/10 bg-black/80 backdrop-blur-sm flex justify-between items-center text-xs text-gray-400">
-         <div className="flex gap-4">
-            {ACTIVE_ZONES.map(z => (
-               <span key={z.name} className="flex items-center gap-1">
-                  <span className="w-1 h-1 bg-brand-green rounded-full"/> {z.name}
-               </span>
-            ))}
-         </div>
-         <div className="flex items-center gap-2 text-brand-green">
-            <Zap size={14} />
-            ~400ms dispatch
-         </div>
+      <Globe
+        ref={globeRef}
+        width={undefined}
+        height={undefined}
+        backgroundColor="#080808"
+        globeImageUrl="https://unpkg.com/three-globe/example/img/earth-dark.jpg"
+        bumpImageUrl="https://unpkg.com/three-globe/example/img/earth-topology.png"
+        pointsData={points}
+        pointLat="lat"
+        pointLng="lng"
+        pointAltitude="size"
+        pointColor="color"
+        pointLabel="label"
+        atmosphereColor="#14f195"
+        atmosphereAltitude={0.15}
+        onGlobeReady={() => {
+          const g = globeRef.current;
+          if (!g) return;
+          const ctrl = g.controls();
+          if (ctrl) {
+            ctrl.autoRotate = true;
+            ctrl.enableZoom = false;
+          }
+        }}
+      />
+      <div className="absolute bottom-0 inset-x-0 p-3 border-t border-white/10 bg-black/70 backdrop-blur-sm flex justify-between items-center text-xs text-gray-400">
+        <div className="flex gap-4 flex-wrap">
+          {ZONES.map((z) => (
+            <span key={z.name} className="flex items-center gap-1">
+              <span className="w-1 h-1 bg-brand-green rounded-full" /> {z.name}
+            </span>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 text-brand-green">
+          <Zap size={14} /> ~400ms dispatch
+        </div>
       </div>
     </div>
   );

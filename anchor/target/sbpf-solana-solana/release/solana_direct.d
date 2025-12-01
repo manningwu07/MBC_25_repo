@@ -1,1 +1,0 @@
-/Users/manningwu/Desktop/personalRepos/solana-direct/anchor/target/sbpf-solana-solana/release/solana_direct.so: /Users/manningwu/Desktop/personalRepos/solana-direct/anchor/programs/solana_direct/src/lib.rs

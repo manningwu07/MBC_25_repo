@@ -1,43 +1,46 @@
-import { ResultAsync } from 'neverthrow';
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import type { FundState, DonationError } from './types';
+import {
+  Connection,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+} from "@solana/web3.js";
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://api.devnet.solana.com';
-const PROGRAM_ID = new PublicKey("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+export const RPC_URL =
+  process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com";
+export const FUND_SEED =
+  process.env.NEXT_PUBLIC_FUND_SEED || "solana-direct-fund";
+export const FUND_BASE = process.env.NEXT_PUBLIC_FUND_BASE as string; // base pubkey
+export const FUND_ADDRESS = process.env.NEXT_PUBLIC_FUND_ADDRESS as string | undefined;
 
-export const getFundState = (fundAddress: string): ResultAsync<FundState, DonationError> => {
-  return ResultAsync.fromPromise(
-    (async () => {
-      const connection = new Connection(RPC_URL);
-      const pubkey = new PublicKey(fundAddress);
-      const accountInfo = await connection.getAccountInfo(pubkey);
+export const connection = new Connection(RPC_URL, "confirmed");
 
-      if (!accountInfo) throw new Error("Account not found");
-
-      const totalRaisedLamports = Number(accountInfo.data.readBigUInt64LE(40));
-      
-      return {
-        address: fundAddress,
-        totalRaised: totalRaisedLamports / LAMPORTS_PER_SOL,
-        authority: "Authority_Address_Here"
-      };
-    })(),
-    (e) => ({ message: e instanceof Error ? e.message : "Unknown error fetching fund state" })
+export async function ensureFundAddress(): Promise<string> {
+  if (FUND_ADDRESS && FUND_ADDRESS.length > 0) return FUND_ADDRESS;
+  if (!FUND_BASE) throw new Error("NEXT_PUBLIC_FUND_BASE missing");
+  const base = new PublicKey(FUND_BASE);
+  const addr = await PublicKey.createWithSeed(
+    base,
+    FUND_SEED,
+    SystemProgram.programId
   );
-};
+  return addr.toBase58();
+}
 
-export const createDonationTransaction = (
-  donor: string,
-  fund: string,
-  amountSol: number
-): ResultAsync<any, DonationError> => {
-  return ResultAsync.fromPromise(
-    (async () => {
-      return {
-        success: true,
-        mockInstruction: `Transfer ${amountSol} SOL from ${donor} to ${fund}`
-      }
-    })(),
-    (e) => ({ message: "Failed to construct transaction" })
+export async function getPoolSol(): Promise<number> {
+  const addr = new PublicKey(await ensureFundAddress());
+  const bal = await connection.getBalance(addr);
+  return bal / LAMPORTS_PER_SOL;
+}
+
+export async function buildDonateTx(donor: PublicKey, amountSol: number) {
+  const to = new PublicKey(await ensureFundAddress());
+  const tx = new Transaction().add(
+    SystemProgram.transfer({
+      fromPubkey: donor,
+      toPubkey: to,
+      lamports: Math.round(amountSol * LAMPORTS_PER_SOL),
+    })
   );
-};
+  return tx;
+}
