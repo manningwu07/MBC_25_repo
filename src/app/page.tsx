@@ -1,5 +1,5 @@
 // app/page.tsx
-import { ArrowRight, Activity, Globe2, ShieldCheck, Coins } from "lucide-react";
+import { ArrowRight, Activity, ShieldCheck, Coins } from "lucide-react";
 import Link from "next/link";
 import { MainNav } from "~/components/layout/main-nav";
 import { Ticker } from "~/components/ui/ticker";
@@ -46,15 +46,13 @@ export default function HomePage() {
         {/* Hero Content */}
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 pt-20 pb-32">
           
-          <div className="max-w-3xl space-y-8">
+          <div className="max-w-3xl space-y-3">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
                <span className="w-2 h-2 rounded-full bg-[#14F195] animate-pulse" />
                <span className="text-sm font-medium text-gray-300">Global Conflicts & Aid Needs (Powered by Polymarket Data)</span>
             </div>
 
             <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.1]">
-              Fast, Secure, <br/>
-              Accountable Donations. <br/>
               <span className="text-transparent bg-clip-text bg-linear-to-r from-[#9945FF] to-[#14F195]">
                 Track Your Impact on the Blockchain.
               </span>
