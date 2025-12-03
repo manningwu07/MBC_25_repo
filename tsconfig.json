@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
-    "typeRoots": ["./src/types", "./node_modules/@types"],
+    "typeRoots": [
+      "./src/types",
+      "./node_modules/@types"
+    ],
     "target": "ES2020",
     "useDefineForClassFields": true,
     "lib": [
@@ -22,7 +25,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
-    "baseUrl": ".",
     "paths": {
       "~/*": [
         "./src/*"
@@ -31,12 +33,12 @@
     "allowJs": true,
     "noEmit": true,
     "incremental": true,
-    "moduleResolution": "node",
     "plugins": [
       {
         "name": "next"
       }
-    ]
+    ],
+    "moduleResolution": "node"
   },
   "include": [
     "next-env.d.ts",

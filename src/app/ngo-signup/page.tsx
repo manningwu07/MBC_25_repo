@@ -52,6 +52,17 @@ export default function NgoSignup() {
                 </span>{' '}
                 allowing you to pull authorized funds.
               </p>
+              <p>
+                Already have an account?{' '}
+                <a
+                  className="text-[#14F195] underline"
+                  href="/ngo-dashboard"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Log in
+                </a>
+              </p>
             </div>
 
             <motion.form

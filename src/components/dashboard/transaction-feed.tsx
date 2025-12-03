@@ -8,27 +8,38 @@ interface Tx {
     id: string;
     amount: number;
     user: string;
+    pool: string;
     time: string;
 }
 
+const POOL_NAMES = [
+    "Ukraine Crisis Fund",
+    "Gaza Relief Wallet",
+    "Sudan Emergency",
+    "Global Clean Water",
+    "Turkey Earthquake Relief"
+];
+
 export function TransactionFeed() {
     const [txs, setTxs] = useState<Tx[]>([
-        { id: '1', amount: 5.5, user: '8xP2...9z1A', time: 'Just now' },
-        { id: '2', amount: 12.0, user: 'C4k1...1b2D', time: '10s ago' },
-        { id: '3', amount: 1.2, user: 'Anon', time: '15s ago' },
+        { id: '1', amount: 5.5, user: 'Anonymous', pool: 'Ukraine Crisis Fund', time: 'Just now' },
+        { id: '2', amount: 12.0, user: 'Anonymous', pool: 'Gaza Relief Wallet', time: '10s ago' },
     ]);
 
-    // Simulate live feed
     useEffect(() => {
         const interval = setInterval(() => {
+            const randomPool = POOL_NAMES[Math.floor(Math.random() * POOL_NAMES.length)];
+            const randomAmount = (Math.random() * 15).toFixed(2);
+            
             const newTx = {
                 id: Math.random().toString(),
-                amount: Number((Math.random() * 10).toFixed(2)),
-                user: `User${Math.floor(Math.random() * 9999)}`,
+                amount: Number(randomAmount),
+                user: 'Anonymous', // Requested change
+                pool: randomPool,  // Requested change
                 time: 'Just now'
             };
             setTxs(prev => [newTx, ...prev.slice(0, 6)]);
-        }, 3500);
+        }, 4000);
         return () => clearInterval(interval);
     }, []);
 
@@ -48,17 +59,17 @@ export function TransactionFeed() {
                             className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5"
                         >
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-brand-green/10 rounded-lg text-brand-green">
+                                <div className="p-2 bg-[#14F195]/10 rounded-lg text-[#14F195]">
                                     <ArrowUpRight size={16} />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-white">{tx.user}</p>
-                                    <p className="text-xs text-gray-500">Donated to Pool A</p>
+                                    <p className="text-sm font-bold text-white">{tx.user}</p>
+                                    <p className="text-[10px] text-gray-500">To: {tx.pool}</p>
                                 </div>
                             </div>
                             <div className="text-right">
-                                <p className="font-mono text-brand-green font-bold">+{tx.amount} SOL</p>
-                                <p className="text-xs text-gray-600">{tx.time}</p>
+                                <p className="font-mono text-[#14F195] font-bold">+{tx.amount} SOL</p>
+                                <p className="text-[10px] text-gray-600">{tx.time}</p>
                             </div>
                         </motion.div>
                     ))}

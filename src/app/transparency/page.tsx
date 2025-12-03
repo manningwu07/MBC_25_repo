@@ -1,107 +1,85 @@
 'use client';
 
 import { MainNav } from '~/components/layout/main-nav';
-import { Download, ExternalLink } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ExternalLink, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Connection, PublicKey } from '@solana/web3.js';
+import { FUND_BASE, RPC_URL } from '~/lib/solana/client';
+
+interface TxItem {
+    signature: string;
+    slot: number;
+    blockTime: number;
+    status: string;
+}
 
 export default function Transparency() {
-  const outflows = [
-    {
-      id: 1,
-      to: 'Medical Supplies Co.',
-      cause: 'Gaza Relief',
-      amount: '5,400 USDC',
-      date: '2025-11-20',
-      tx: '3x9...2a1',
-    },
-    {
-      id: 2,
-      to: 'Local Logistics LLC',
-      cause: 'Ukraine Fund',
-      amount: '12,200 USDC',
-      date: '2025-11-19',
-      tx: '8z2...9cc',
-    },
-    {
-      id: 3,
-      to: 'Water Filters Inc',
-      cause: 'Clean Water',
-      amount: '2,100 USDC',
-      date: '2025-11-18',
-      tx: '1p0...5mm',
-    },
-  ];
+  const [txs, setTxs] = useState<TxItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+        try {
+            const connection = new Connection(RPC_URL, "confirmed");
+            // Use the FUND_BASE (The wallet you generated)
+            const pubkey = new PublicKey(FUND_BASE);
+            const signatures = await connection.getSignaturesForAddress(pubkey, { limit: 10 });
+            
+            const items = signatures.map(sig => ({
+                signature: sig.signature,
+                slot: sig.slot,
+                blockTime: sig.blockTime || Date.now()/1000,
+                status: sig.err ? 'Failed' : 'Success'
+            }));
+            setTxs(items);
+        } catch (e) {
+            console.error("Failed to fetch history", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchHistory();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#020410] text-white">
       <MainNav />
-
-      <motion.div
-        className="max-w-6xl mx-auto py-12 px-6"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: 'easeOut' }}
-      >
-        <motion.div
-          className="flex justify-between items-end mb-8"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: 'easeOut', delay: 0.05 }}
-        >
-          <div>
-            <h1 className="text-3xl font-bold">Transparency Reports</h1>
-            <p className="text-gray-400 mt-2">
-              Public ledger of all fund outflows from NGO sub-wallets.
-            </p>
-          </div>
-          <button className="flex items-center gap-2 text-sm text-[#14F195] hover:underline">
-            <Download size={16} /> Export CSV
-          </button>
-        </motion.div>
-
-        <motion.div
-          className="bg-[#11131F] border border-white/5 rounded-xl overflow-hidden"
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: 'easeOut', delay: 0.1 }}
-        >
+      <div className="max-w-6xl mx-auto py-12 px-6">
+        <h1 className="text-3xl font-bold mb-8">Live On-Chain Ledger</h1>
+        
+        <div className="bg-[#11131F] border border-white/5 rounded-xl overflow-hidden">
           <table className="w-full text-left">
-            <thead className="bg-white/5 text-gray-400 text-xs uppercase tracking-wider">
+            <thead className="bg-white/5 text-gray-400 text-xs uppercase">
               <tr>
-                <th className="p-4">Recipient</th>
-                <th className="p-4">Source Fund</th>
-                <th className="p-4">Amount</th>
-                <th className="p-4">Date</th>
-                <th className="p-4 text-right">Verification</th>
+                <th className="p-4">Signature</th>
+                <th className="p-4">Status</th>
+                <th className="p-4">Time</th>
+                <th className="p-4 text-right">Explorer</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {outflows.map((row, idx) => (
-                <motion.tr
-                  key={row.id}
-                  className="hover:bg-white/5 transition-colors"
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, ease: 'easeOut', delay: 0.12 + idx * 0.04 }}
-                >
-                  <td className="p-4 font-medium">{row.to}</td>
-                  <td className="p-4 text-gray-400">{row.cause}</td>
-                  <td className="p-4 font-mono text-[#14F195]">{row.amount}</td>
-                  <td className="p-4 text-gray-500 text-sm">{row.date}</td>
-                  <td className="p-4 text-right">
-                    <a
-                      href="#"
-                      className="inline-flex items-center gap-1 text-xs text-[#9945FF] hover:text-white"
-                    >
-                      {row.tx} <ExternalLink size={10} />
-                    </a>
-                  </td>
-                </motion.tr>
-              ))}
+                {loading ? (
+                    <tr><td colSpan={4} className="p-8 text-center"><Loader2 className="animate-spin inline mr-2"/> Loading Blockchain Data...</td></tr>
+                ) : txs.length === 0 ? (
+                    <tr><td colSpan={4} className="p-8 text-center text-gray-500">No transactions found on Devnet yet. Make a donation!</td></tr>
+                ) : (
+                    txs.map((row) => (
+                        <tr key={row.signature} className="hover:bg-white/5 transition-colors">
+                            <td className="p-4 font-mono text-sm text-gray-300 truncate max-w-[200px]">{row.signature}</td>
+                            <td className="p-4"><span className="bg-[#14F195]/10 text-[#14F195] text-xs px-2 py-1 rounded">{row.status}</span></td>
+                            <td className="p-4 text-gray-500 text-sm">{new Date(row.blockTime * 1000).toLocaleString()}</td>
+                            <td className="p-4 text-right">
+                                <a href={`https://explorer.solana.com/tx/${row.signature}?cluster=devnet`} target="_blank" className="text-[#9945FF] text-xs hover:underline flex items-center justify-end gap-1">
+                                    View <ExternalLink size={10} />
+                                </a>
+                            </td>
+                        </tr>
+                    ))
+                )}
             </tbody>
           </table>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
     </div>
   );
 }
