@@ -27,13 +27,13 @@ export function TransactionFeed() {
                 user: `User${Math.floor(Math.random() * 9999)}`,
                 time: 'Just now'
             };
-            setTxs(prev => [newTx, ...prev.slice(0, 4)]);
+            setTxs(prev => [newTx, ...prev.slice(0, 6)]);
         }, 3500);
         return () => clearInterval(interval);
     }, []);
 
     return (
-         <div className="bg-[#050505] border border-white/10 rounded-3xl p-6 h-[400px] overflow-hidden flex flex-col">
+         <div className="bg-[#050505] border border-white/10 rounded-3xl p-6 h-full overflow-hidden flex flex-col">
             <h3 className="text-gray-400 text-sm font-semibold mb-4 uppercase tracking-wider">
                 Live On-Chain Activity
             </h3>

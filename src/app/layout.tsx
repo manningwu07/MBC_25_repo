@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Solana-Aid | Direct Humanitarian Giving",
   description: "Decentralized emergency aid distribution on Solana",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

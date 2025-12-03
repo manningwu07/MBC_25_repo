@@ -52,7 +52,7 @@ export default function CausesPage() {
                 <div className="space-y-2">
                     <h3 className="text-sm font-bold text-gray-400 uppercase">Recent On-Chain Relief</h3>
                     {/* Modified Container for feed */}
-                    <div className="h-[300px] overflow-hidden rounded-xl border border-white/5 relative">
+                    <div className="h-[550px] overflow-hidden rounded-xl border border-white/5 relative">
                          <div className="absolute inset-0 z-0">
                             <TransactionFeed /> 
                             {/* Note: You might need to adjust styling inside TransactionFeed to fit this smaller container perfectly, or just wrap it */}

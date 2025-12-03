@@ -1,12 +1,11 @@
-// components/layout/main-nav.tsx
 'use client';
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shield } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { usePrivy } from "@privy-io/react-auth";
 import { clsx } from "clsx";
+import Image from "next/image";
 
 export function MainNav() {
   const pathname = usePathname();
@@ -21,14 +20,13 @@ export function MainNav() {
   ];
 
   return (
-    <nav className="flex justify-between items-center py-5 px-6 md:px-12 border-b border-white/5 bg-[#020410]/80 backdrop-blur-md sticky top-0 z-50">
-      <Link href="/" className="flex items-center gap-2 group">
-        <div className="relative">
-            <Shield className="w-8 h-8 text-[#9945FF] group-hover:text-[#14F195] transition-colors" />
-            <div className="absolute inset-0 bg-[#9945FF]/20 blur-lg rounded-full" />
+    <nav className="flex justify-between items-center py-4 px-6 md:px-12 border-b border-white/5 bg-[#020410]/90 backdrop-blur-md sticky top-0 z-50">
+      <Link href="/" className="flex items-center gap-3 group">
+        <div className="relative w-8 h-8">
+            <Image src="/favicon.ico" alt="Logo" fill className="object-contain" />
         </div>
         <div className="flex flex-col">
-            <span className="text-xl font-bold tracking-tight text-white leading-none">Solana-Aid:</span>
+            <span className="text-lg font-bold tracking-tight text-white leading-none">Solana-Aid</span>
             <span className="text-[10px] text-gray-400 tracking-wider">Direct, Transparent Humanitarian Giving.</span>
         </div>
       </Link>
@@ -57,8 +55,7 @@ export function MainNav() {
             <Button variant="outline" onClick={logout} className="h-9 text-xs">Disconnect</Button>
           </div>
         ) : (
-            // Matching the white button from screenshot
-          <Button onClick={login} className="bg-white text-black hover:bg-gray-200 font-bold px-6">
+          <Button onClick={login} className="bg-[#14F195] text-black hover:bg-[#14F195]/80 font-bold px-6 border-none">
             Connect Wallet
           </Button>
         )}
