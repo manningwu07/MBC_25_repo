@@ -6,7 +6,7 @@ import Providers from "~/components/providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "SolanaDirect | Emergency Aid",
+  title: "Solana-Aid | Direct Humanitarian Giving",
   description: "Decentralized emergency aid distribution on Solana",
 };
 
@@ -17,9 +17,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${inter.className} bg-[#050505] text-white selection:bg-brand-green/30`}>
         <Providers>
-          <div className="min-h-screen flex flex-col">{children}</div>
+          <div className="min-h-screen flex flex-col">
+            {children}
+          </div>
         </Providers>
       </body>
     </html>

@@ -1,186 +1,122 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-'use client';
+// app/page.tsx
+import { ArrowRight, Activity, Globe2, ShieldCheck, Coins } from "lucide-react";
+import Link from "next/link";
+import { MainNav } from "~/components/layout/main-nav";
+import { Ticker } from "~/components/ui/ticker";
 
-import { usePrivy, useWallets } from '@privy-io/react-auth';
-import { useSignAndSendTransaction } from '@privy-io/react-auth/solana';
-import { useState, useCallback, useEffect } from 'react';
-import { Shield, Activity, Coins, Loader2 } from 'lucide-react';
-import { Button } from '~/components/ui/button';
-import { getPoolSol, buildSwapAndDonateTx } from '~/lib/solana/client';
-import { LiveMap } from '~/components/dashboard/live-map';
-import { TransactionFeed } from '~/components/dashboard/transaction-feed';
-import { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
+// Mock Data for the Cards
+const FEATURED_FUNDS = [
+  {
+    title: "Ukraine Crisis Fund",
+    id: "ukr-fund",
+    icon: <ShieldCheck className="w-6 h-6 text-red-500" />,
+    wallet: "SolanaWalletUkr...KiNng",
+    color: "bg-red-500/10 border-red-500/20"
+  },
+  {
+    title: "Gaza Relief Wallet",
+    id: "gaza-relief",
+    icon: <Activity className="w-6 h-6 text-emerald-500" />,
+    wallet: "SolanaWalletGaza...2Sjt",
+    color: "bg-emerald-500/10 border-emerald-500/20"
+  },
+  {
+    title: "Clean Water Initiative",
+    id: "water-dao",
+    icon: <Coins className="w-6 h-6 text-blue-500" />,
+    wallet: "SolanaWalletH2O...WvtI",
+    color: "bg-blue-500/10 border-blue-500/20"
+  }
+];
 
-export default function Home() {
-  const { login, authenticated, user, logout } = usePrivy();
-  const { wallets } = useWallets();
-  const { signAndSendTransaction } = useSignAndSendTransaction();
-  
-  const [amount, setAmount] = useState<string>('');
-  const [totalRaised, setTotalRaised] = useState<number>(0);
-  const [loading, setLoading] = useState(false);
-
-  const refreshTvl = useCallback(async () => {
-    try {
-      const tvl = await getPoolSol();
-      setTotalRaised(tvl);
-    } catch (e: any) {
-      console.warn("TVL fetch failed:", e?.message);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refreshTvl();
-    const id = setInterval(() => void refreshTvl(), 10000);
-    return () => clearInterval(id);
-  }, [refreshTvl]);
-
-  const handleDonate = useCallback(async () => {
-    if (!amount || isNaN(Number(amount)) || !user?.wallet) return;
-    
-    // Find the specific wallet object
-    const wallet = wallets.find((w) => w.address === user.wallet?.address);
-    if (!wallet) return;
-
-    setLoading(true);
-
-    try {
-      const tx = await buildSwapAndDonateTx(new PublicKey(wallet.address), Number(amount));
-
-      let serializedTx: Uint8Array;
-      if (tx instanceof VersionedTransaction) {
-        serializedTx = tx.serialize();
-      } else {
-        serializedTx = (tx as Transaction).serializeMessage();
-      }
-
-      const { signature } = await signAndSendTransaction({ 
-        transaction: serializedTx, 
-        wallet: wallet as any 
-      });
-      
-      console.log("Tx Sent:", signature);
-      await new Promise(r => setTimeout(r, 2000));
-      setTotalRaised(prev => prev + Number(amount));
-      setAmount('');
-      alert("Donation successful! Signature: " + signature.slice(0, 8));
-    } catch (e: any) {
-      console.error(e);
-      alert("Donation failed: " + e?.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [amount, user, wallets, signAndSendTransaction]);
-
+export default function HomePage() {
   return (
-    <main className="flex-1 w-full max-w-7xl mx-auto p-4 md:p-6 space-y-12">
-      {/* Header */}
-      <nav className="flex justify-between items-center py-4 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <Shield className="w-8 h-8 text-brand-green" />
-          <h1 className="text-xl font-bold tracking-tight">SolanaDirect</h1>
+    <div className="min-h-screen bg-[#020410] text-white flex flex-col font-sans selection:bg-[#14F195] selection:text-black">
+      <MainNav />
+
+      <main className="flex-1 relative flex flex-col justify-center items-center overflow-hidden">
+        {/* Background Map Effect */}
+        <div className="absolute inset-0 z-0 opacity-30 pointer-events-none">
+           {/* Replace this with a real static map image in public folder if available */}
+           <div className="w-full h-full bg-[url('https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg')] bg-no-repeat bg-center bg-cover mix-blend-overlay opacity-20 invert" />
+           <div className="absolute inset-0 bg-linear-to-t from-[#020410] via-transparent to-[#020410]" />
+           <div className="absolute inset-0 bg-linear-to-r from-[#020410] via-transparent to-[#020410]" />
         </div>
-        <div className="flex items-center gap-4">
-          {authenticated ? (
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-400 font-mono hidden md:block">
-                {user?.wallet ? `${user.wallet.address.slice(0, 4)}...${user.wallet.address.slice(-4)}` : user?.email?.address}
-              </span>
-              <Button variant="outline" onClick={logout}>Disconnect</Button>
+
+        {/* Hero Content */}
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 pt-20 pb-32">
+          
+          <div className="max-w-3xl space-y-8">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+               <span className="w-2 h-2 rounded-full bg-[#14F195] animate-pulse" />
+               <span className="text-sm font-medium text-gray-300">Global Conflicts & Aid Needs (Powered by Polymarket Data)</span>
             </div>
-          ) : (
-            <Button onClick={login}>Connect Wallet</Button>
-          )}
-        </div>
-      </nav>
 
-      {/* Hero & Title */}
-      <div className="text-center max-w-4xl mx-auto space-y-6">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-green/10 text-brand-green text-sm mx-auto border border-brand-green/20">
-          <Activity className="w-4 h-4" />
-          <span>Live Emergency Response</span>
-        </div>
-        <h2 className="text-5xl md:text-7xl font-bold leading-tight tracking-tight">
-          Decentralized Aid <br />
-          <span className="text-brand-green">Delivered Instantly</span>
-        </h2>
-        <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-          Bypass intermediaries. Funds reach emergency zones in seconds, fully verifiable on-chain.
-        </p>
-      </div>
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.1]">
+              Fast, Secure, <br/>
+              Accountable Donations. <br/>
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-[#9945FF] to-[#14F195]">
+                Track Your Impact on the Blockchain.
+              </span>
+            </h1>
 
-      {/* 1. Global Donation Area (Top) */}
-      <section className="bg-white/5 rounded-3xl p-1 border border-white/10 backdrop-blur-sm shadow-2xl overflow-hidden">
-         <div className="grid grid-cols-1 md:grid-cols-2">
-             {/* TVL Section */}
-             <div className="p-8 md:p-10 flex flex-col justify-center border-b md:border-b-0 md:border-r border-white/10 bg-black/20">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-3 bg-yellow-500/10 rounded-xl text-yellow-500">
-                        <Coins size={24} />
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-200">Global Relief Pool</h3>
+            <p className="text-xl text-gray-400 max-w-xl leading-relaxed">
+              Connect with verified NGOs and specialized funds directly. Bypass bureaucracy and send aid where it&apos;s needed in seconds using Solana & USDC.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-4 pt-4">
+              <Link href="/causes">
+                <button className="bg-white text-black font-bold text-lg px-8 py-4 rounded-full hover:scale-105 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+                  Donate Now
+                </button>
+              </Link>
+              <Link href="/ngo-signup">
+                <button className="bg-transparent border border-white/30 text-white font-bold text-lg px-8 py-4 rounded-full hover:bg-white/10 transition-colors backdrop-blur-sm">
+                  Register NGO
+                </button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Cards Section (Bottom of Hero) */}
+          <div className="mt-24 grid grid-cols-1 md:grid-cols-12 gap-6">
+             
+             {/* Verified Badge */}
+             <div className="md:col-span-3 bg-[#11131F]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 flex flex-col justify-center items-center text-center gap-4 shadow-2xl">
+                <div className="flex gap-4 opacity-80">
+                   {/* Placeholders for logos (RedCross, StJude, etc) */}
+                   <div className="w-10 h-10 bg-white rounded-md flex items-center justify-center text-red-600 font-bold text-xs">RC</div>
+                   <div className="w-10 h-10 bg-white rounded-md flex items-center justify-center text-blue-600 font-bold text-xs">SJ</div>
+                   <div className="w-10 h-10 bg-white rounded-md flex items-center justify-center text-black font-bold text-xs">MSF</div>
                 </div>
                 <div>
-                    <p className="text-sm text-gray-400 mb-1 font-medium">Total Value Locked (SOL)</p>
-                    <div className="text-5xl md:text-6xl font-mono font-bold text-white tracking-tighter">
-                        {totalRaised.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </div>
-                    <div className="text-sm text-brand-green mt-3 flex items-center gap-1 bg-brand-green/10 w-fit px-2 py-1 rounded-md">
-                        <Activity className="w-3 h-3" /> +12.5% last hour
-                    </div>
+                   <h3 className="font-bold text-white">Verified NGOs</h3>
+                   <p className="text-xs text-gray-400">KYC Verified Entities</p>
                 </div>
              </div>
 
-             {/* Donate Input Section */}
-             <div className="p-8 md:p-10 flex flex-col justify-center bg-white/5 md:bg-transparent">
-                {!authenticated ? (
-                   <div className="text-center space-y-4">
-                      <p className="text-gray-300 text-lg">Connect your wallet to contribute directly to the relief fund.</p>
-                      <Button onClick={login} className="w-full py-6 text-lg">Connect Wallet to Donate</Button>
-                   </div>
-                ) : (
-                   <div className="space-y-6">
-                      <div className="flex justify-between items-center">
-                        <label className="text-base font-medium text-gray-200">Donate Amount (SOL)</label>
-                        <span className="text-xs text-brand-green bg-brand-green/10 px-2 py-1 rounded">Auto-swaps to USDC</span>
+             {/* Specific Funds */}
+             {FEATURED_FUNDS.map((fund) => (
+                <div key={fund.id} className={`md:col-span-3 bg-[#11131F]/60 backdrop-blur-md border border-white/5 rounded-3xl p-6 flex flex-col justify-between hover:bg-[#1A1D2D] transition-colors cursor-pointer group`}>
+                   <div className="flex justify-between items-start mb-4">
+                      <div className={`p-3 rounded-2xl ${fund.color}`}>
+                        {fund.icon}
                       </div>
-                      
-                      <div className="flex gap-3">
-                        <input 
-                          type="number" 
-                          value={amount}
-                          onChange={(e) => setAmount(e.target.value)}
-                          placeholder="0.00"
-                          className="flex-1 bg-black/50 border border-white/20 rounded-xl px-4 py-4 focus:outline-none focus:border-brand-green transition-all font-mono text-xl text-white placeholder:text-gray-600"
-                        />
-                        <Button onClick={handleDonate} disabled={loading || !amount} className="px-8 py-4 text-lg h-auto">
-                          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Donate"}
-                        </Button>
-                      </div>
-                      <p className="text-xs text-gray-500 text-center">
-                        Secure transaction verified on Solana Mainnet
-                      </p>
+                      <ArrowRight className="text-gray-600 group-hover:text-white transition-colors -rotate-45 group-hover:rotate-0" />
                    </div>
-                )}
-             </div>
-         </div>
-      </section>
+                   <div>
+                      <h4 className="font-bold text-lg mb-1">{fund.title}</h4>
+                      <p className="font-mono text-[10px] text-gray-500 truncate">{fund.wallet}</p>
+                   </div>
+                </div>
+             ))}
 
-      {/* 2. Map (Middle - Full Width) */}
-      <section className="w-full">
-        <div className="flex items-center gap-2 mb-4 px-2">
-            <div className="w-2 h-2 bg-brand-green rounded-full animate-pulse" />
-            <h3 className="font-semibold text-gray-300">Live Impact Zones</h3>
-        </div>
-        <div className="h-[500px] md:h-[600px] w-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl relative">
-             <LiveMap />
-        </div>
-      </section>
+          </div>
 
-      {/* 3. Live Activity (Bottom - Full Width) */}
-      <section className="w-full">
-         <TransactionFeed />
-      </section>
-    </main>
+        </div>
+      </main>
+
+      <Ticker />
+    </div>
   );
 }
