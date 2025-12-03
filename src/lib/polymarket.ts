@@ -1,116 +1,90 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/polymarket.ts
 
-// A simple mapping for the hackathon to convert text to coordinates
-// In a real app, you'd use a Geocoding API or LLM
-const GEO_CACHE: Record<string, { lat: number; lng: number }> = {
-  israel: { lat: 31.0461, lng: 34.8516 },
-  gaza: { lat: 31.5, lng: 34.4667 },
-  hamas: { lat: 31.5, lng: 34.4667 },
-  ukraine: { lat: 48.3794, lng: 31.1656 },
-  russia: { lat: 61.524, lng: 105.3188 },
-  taiwan: { lat: 23.6978, lng: 120.9605 },
-  china: { lat: 35.8617, lng: 104.1954 },
-  sudan: { lat: 12.8628, lng: 30.2176 },
-  yemen: { lat: 15.5527, lng: 48.5164 },
-  usa: { lat: 37.0902, lng: -95.7129 },
-  election: { lat: 38.9072, lng: -77.0369 }, // Pin to DC
-};
+const RED_CROSS_WALLET = '2ypyDnf2zU8DgMtW8Urjv7G1ZddAAANjRK1WyL7QxLDv'; // Your "NGO" key
+const DIRECT_RELIEF_WALLET = 'sqBGUjzmQwhMyqpvqD14gy6ov65ujbnJiLhAmfucfq6'; // Your "Fund" key
 
-export interface ConflictZone {
-  id: string;
-  name: string;
-  lat: number;
-  lng: number;
-  volume: number; // Used for point size
-  url: string;
-}
 
-export async function fetchPolymarketData(): Promise<ConflictZone[]> {
-  try {
-    // Fetch active markets. limiting to 20 for performance
-    // We filter for 'active' and closed=false
-    const response = await fetch('/api/polymarket');
+	const REGION_MAP: Record<string, { lat: number; lng: number; id: string }> = {
+	  'ukraine': { lat: 48.3794, lng: 31.1656, id: 'eastern-europe' },
+	  'russia': { lat: 48.3794, lng: 31.1656, id: 'eastern-europe' },
+	  'zelensky': { lat: 48.3794, lng: 31.1656, id: 'eastern-europe' },
+	  'putin': { lat: 48.3794, lng: 31.1656, id: 'eastern-europe' },
+	  
+	  'gaza': { lat: 31.5, lng: 34.4667, id: 'middle-east' },
+	  'israel': { lat: 31.5, lng: 34.4667, id: 'middle-east' },
+	  'hamas': { lat: 31.5, lng: 34.4667, id: 'middle-east' },
+	  'palestine': { lat: 31.5, lng: 34.4667, id: 'middle-east' },
+	  
+	  'sudan': { lat: 12.8628, lng: 30.2176, id: 'sudan' },
+	  'yemen': { lat: 15.5527, lng: 48.5164, id: 'yemen' },
+	  'taiwan': { lat: 23.6978, lng: 120.9605, id: 'taiwan' },
+	  'china': { lat: 35.8617, lng: 104.1954, id: 'asia' },
+	  'trump': { lat: 38.9072, lng: -77.0369, id: 'usa' }, 
+	  'election': { lat: 38.9072, lng: -77.0369, id: 'usa' },
+	};
+	
+	export interface ConflictZone {
+	  id: string;
+	  name: string;
+	  lat: number;
+	  lng: number;
+	  volume: number;
+	  url: string;
+	  activeWallets: { name: string, address: string }[];
+	}
+	
+	export async function fetchPolymarketData(): Promise<ConflictZone[]> {
+	  try {
+	    // 1. Fetch Top 50 Active Markets by Volume
+	    const response = await fetch('/api/polymarket');
 
-    if (!response.ok) {
-      console.warn('Proxy returned error, using fallback data');
-      return [];
-    }
-
+    if (!response.ok) throw new Error('Proxy failed');
     const data = await response.json();
+
+    const uniqueRegions = new Set<string>();
     const zones: ConflictZone[] = [];
-
-    // Filter relevant keywords for "Aid" context
-    const keywords = [
-      'war',
-      'conflict',
-      'invasion',
-      'peace',
-      'military',
-      'crisis',
-      'election',
-    ];
-
-    data.forEach((event: any) => {
-      const title = event.title.toLowerCase();
-      const description = event.description.toLowerCase();
-
-      // 1. Check if relevant
-      const isRelevant = keywords.some(
-        (k) => title.includes(k) || description.includes(k)
-      );
-      if (!isRelevant) return;
-
-      // 2. Extract Location via keyword matching against our Cache
-      let location = null;
-      for (const [key, coords] of Object.entries(GEO_CACHE)) {
-        if (title.includes(key) || description.includes(key)) {
-          location = coords;
-          break;
-        }
-      }
-
-      if (location) {
-        zones.push({
-          id: event.id,
-          name: event.title,
-          lat: location.lat,
-          lng: location.lng,
-          volume: event.volume || 1000, // Fallback volume
-          url: `https://polymarket.com/event/${event.slug}`,
-        });
-      }
-    });
-
-    return zones;
-  } catch (error) {
-    console.error('Polymarket fetch failed', error);
-    // Fallback data if API fails (likely CORS on localhost)
-    return [
-      {
-        id: '1',
-        name: 'Gaza Ceasefire Prediction',
-        lat: 31.5,
-        lng: 34.5,
-        volume: 500000,
-        url: '#',
-      },
-      {
-        id: '2',
-        name: 'Ukraine Sovereignty',
-        lat: 49,
-        lng: 31,
-        volume: 1200000,
-        url: '#',
-      },
-      {
-        id: '3',
-        name: 'Sudan Crisis',
-        lat: 15,
-        lng: 30,
-        volume: 50000,
-        url: '#',
-      },
-    ];
-  }
-}
+	
+	    // 2. Iterate and Filter
+	    for (const event of data) {
+	        // Stop if we have top 5 distinct conflicts
+	        if (zones.length >= 5) break;
+	
+	        const text = (event.title + " " + event.description).toLowerCase();
+	        
+	        // Find matching region
+	        let match = null;
+	        for (const [keyword, info] of Object.entries(REGION_MAP)) {
+	            if (text.includes(keyword)) {
+	                match = info;
+	                break;
+	            }
+	        }
+	
+	        // If matched AND we haven't added this region yet
+	        if (match && !uniqueRegions.has(match.id)) {
+	            uniqueRegions.add(match.id);
+	            
+	            zones.push({
+	                id: event.id,
+	                name: event.title,
+	                lat: match.lat,
+	                lng: match.lng,
+	                volume: event.volume || 0,
+	                url: `https://polymarket.com/event/${event.slug}`,
+	                // Assign REAL wallets for the hackathon demo
+	                activeWallets: [
+	                    { name: "Verified NGO Wallet", address: RED_CROSS_WALLET  },
+	                    { name: "Regional Relief Fund", address: DIRECT_RELIEF_WALLET }
+	                ]
+	            });
+	        }
+	    }
+	
+	    // Sort by volume just in case
+	    return zones.sort((a, b) => b.volume - a.volume);
+	  } catch (error) {
+	    console.error("Polymarket Fetch Error:", error);
+	    return []; 
+	  }
+	}

@@ -41,8 +41,9 @@ export async function getPoolSol(): Promise<number> {
 }
 
 // --- Standard SOL Donation (Devnet Friendly) ---
-export async function buildDonateTx(donor: PublicKey, amountSol: number) {
-  const to = new PublicKey(await ensureFundAddress());
+export async function buildDonateTx(donor: PublicKey, amountSol: number, recipient?: PublicKey) {
+  const to = recipient ? recipient : new PublicKey(await ensureFundAddress());
+  
   const tx = new Transaction().add(
     SystemProgram.transfer({
       fromPubkey: donor,
@@ -50,6 +51,11 @@ export async function buildDonateTx(donor: PublicKey, amountSol: number) {
       lamports: Math.round(amountSol * LAMPORTS_PER_SOL),
     })
   );
+  
+  tx.feePayer = donor;
+  const { blockhash } = await connection.getLatestBlockhash();
+  tx.recentBlockhash = blockhash;
+  
   return tx;
 }
 
