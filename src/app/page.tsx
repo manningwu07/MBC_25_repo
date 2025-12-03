@@ -1,52 +1,83 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { usePrivy } from '@privy-io/react-auth';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { useSignAndSendTransaction } from '@privy-io/react-auth/solana';
 import { useState, useCallback, useEffect } from 'react';
 import { Shield, Activity, Coins, Loader2 } from 'lucide-react';
 import { Button } from '~/components/ui/button';
-import { getPoolSol } from '~/lib/solana/client';
+import { getPoolSol, buildSwapAndDonateTx } from '~/lib/solana/client';
 import { LiveMap } from '~/components/dashboard/live-map';
 import { TransactionFeed } from '~/components/dashboard/transaction-feed';
+import { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
 
 export default function Home() {
   const { login, authenticated, user, logout } = usePrivy();
+  const { wallets } = useWallets();
+  const { signAndSendTransaction } = useSignAndSendTransaction();
   
   const [amount, setAmount] = useState<string>('');
   const [totalRaised, setTotalRaised] = useState<number>(0);
   const [loading, setLoading] = useState(false);
-  const [fundError, setFundError] = useState<string | null>(null);
 
   const refreshTvl = useCallback(async () => {
     try {
       const tvl = await getPoolSol();
       setTotalRaised(tvl);
-      setFundError(null);
     } catch (e: any) {
-      console.warn("TVL fetch failed, using mock:", e?.message);
-      setTotalRaised(12450.5);
-      setFundError(e?.message ?? "TVL fetch failed");
+      console.warn("TVL fetch failed:", e?.message);
     }
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshTvl();
     const id = setInterval(() => void refreshTvl(), 10000);
     return () => clearInterval(id);
   }, [refreshTvl]);
 
   const handleDonate = useCallback(async () => {
-    if (!amount || isNaN(Number(amount))) return;
+    if (!amount || isNaN(Number(amount)) || !user?.wallet) return;
+    
+    // Find the specific wallet object
+    const wallet = wallets.find((w) => w.address === user.wallet?.address);
+    if (!wallet) return;
+
     setLoading(true);
 
-    await new Promise(r => setTimeout(r, 1500));
-    
-    setTotalRaised(prev => prev + Number(amount));
-    setAmount('');
-    setLoading(false);
-    alert("Donation successful! Thank you for helping.");
-  }, [amount]);
+    try {
+      // 1. Build the Transaction (Swap or Standard)
+      const tx = await buildSwapAndDonateTx(new PublicKey(wallet.address), Number(amount));
+
+      // 2. Serialize the transaction to Uint8Array as required by Privy's API
+      let serializedTx: Uint8Array;
+      if (tx instanceof VersionedTransaction) {
+        serializedTx = tx.serialize();
+      } else {
+        // legacy Transaction: serializeMessage returns the message bytes to be signed/sent
+        serializedTx = (tx as Transaction).serializeMessage();
+      }
+
+      // 3. Send using Privy's Hook
+      // FIX: Cast 'wallet' to 'any' to resolve the Strict Type Mismatch
+      const { signature } = await signAndSendTransaction({ 
+        transaction: serializedTx, 
+        wallet: wallet as any 
+      });
+      
+      console.log("Tx Sent:", signature);
+      
+      await new Promise(r => setTimeout(r, 2000));
+      
+      setTotalRaised(prev => prev + Number(amount));
+      setAmount('');
+      alert("Donation successful! Signature: " + signature.slice(0, 8));
+    } catch (e: any) {
+      console.error(e);
+      alert("Donation failed: " + e?.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [amount, user, wallets, signAndSendTransaction]);
 
   return (
     <main className="flex-1 w-full max-w-7xl mx-auto p-6 space-y-8">
@@ -70,7 +101,7 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Hero Text - Centered for Impact */}
+      {/* Hero */}
       <div className="text-center max-w-3xl mx-auto space-y-6 pb-4">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-green/10 text-brand-green text-sm mx-auto">
           <Activity className="w-4 h-4" />
@@ -85,19 +116,17 @@ export default function Home() {
         </p>
       </div>
 
-      {/* New Visual Dashboard Grid */}
+      {/* Dashboard */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
-        {/* Map takes up 2 columns */}
         <div className="lg:col-span-2 h-full min-h-[400px]">
           <LiveMap />
         </div>
-        {/* Feed takes up 1 column */}
         <div className="lg:col-span-1 h-full min-h-[400px]">
           <TransactionFeed />
         </div>
       </section>
 
-      {/* Donation Action Area */}
+      {/* Donation Area */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white/5 rounded-3xl p-8 border border-white/10 mt-8 backdrop-blur-sm">
          <div className="space-y-4">
             <h3 className="text-2xl font-bold flex items-center gap-2">
@@ -125,7 +154,7 @@ export default function Home() {
                <div className="p-6 bg-black/40 rounded-xl border border-white/10 space-y-4">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium">Donate Amount (SOL)</label>
-                    <span className="text-xs text-brand-green">Ready to transfer</span>
+                    <span className="text-xs text-brand-green">Auto-swaps to USDC</span>
                   </div>
                   <div className="flex gap-2">
                     <input 
@@ -140,7 +169,7 @@ export default function Home() {
                     </Button>
                   </div>
                   <p className="text-xs text-gray-500 text-center">
-                    Transaction will be verified on Solana Devnet
+                    Transaction will be verified on Solana Mainnet
                   </p>
                </div>
             )}
