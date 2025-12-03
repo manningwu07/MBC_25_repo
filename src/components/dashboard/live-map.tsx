@@ -2,163 +2,242 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Zap, ExternalLink, Loader2, Maximize2, Minimize2, Wallet } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { ExternalLink, Loader2, Maximize2, X, Wallet } from 'lucide-react';
 import { clsx } from 'clsx';
 import { fetchPolymarketData, ConflictZone } from '~/lib/polymarket';
 
 // Dynamic import for Globe
 const Globe: any = dynamic(() => import('react-globe.gl'), { 
   ssr: false,
-  loading: () => <div className="w-full h-full bg-[#080808] animate-pulse" /> 
+  loading: () => <div className="w-full h-full bg-[#050505] animate-pulse flex items-center justify-center text-gray-500">Loading 3D Map...</div> 
 }) as any;
 
-// Helper to simulate "Verified Wallets" for the hackathon demo based on live data
 const DEMO_WALLETS = ['RedCross-SOL', 'DirectRelief-DAO', 'UNICEF-Crypto', 'MercyCorps-L2', 'GazaRelief-Fund'];
 const getDemoWallets = (seedStr: string) => {
-    // Deterministic selection so it stays consistent per zone
     const index = seedStr.charCodeAt(0) % (DEMO_WALLETS.length - 1);
     return DEMO_WALLETS.slice(index, index + 2);
 };
 
 export function LiveMap() {
   const globeRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
   const [zones, setZones] = useState<(ConflictZone & { activeWallets: string[], searchQuery: string })[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // New State for UI interactions
+  // UI States
   const [isExpanded, setIsExpanded] = useState(false);
-  const [hoveredNode, setHoveredNode] = useState<any>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
-  // Fetch real data on mount & augment for Demo UI
+  // Interaction States
+  const [hoveredNode, setHoveredNode] = useState<any>(null);
+  const [selectedNode, setSelectedNode] = useState<any>(null); // New: Locks the view
+  
+  // Decide what to show: Selected takes priority over Hovered
+  const activeNode = selectedNode || hoveredNode;
+
+  // Helper to handle closing full screen safely
+  const handleDeExpand = useCallback(() => {
+      setIsExpanded(false);
+      setSelectedNode(null); // Optional: reset selection on close
+      // Reset camera after a slight delay to allow transition
+      setTimeout(() => {
+          globeRef.current?.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 1000);
+      }, 500);
+  }, []);
+
+
+  const points = useMemo(
+    () =>
+      zones.map((z) => ({
+        ...z,
+        size: Math.max(0.3, Math.min(1.2, Math.log(z.volume) / 15)),
+        color: selectedNode?.id === z.id ? '#ffffff' : '#14f195',
+        label: z.name
+      })),
+    [zones, selectedNode]
+  );
+
+
   useEffect(() => {
     fetchPolymarketData().then((data) => {
       const augmented = data.map(z => ({
         ...z,
-        searchQuery: z.name, // Use the market name for Ground News search
-        activeWallets: getDemoWallets(z.name) // Attach demo wallets
+        searchQuery: z.name,
+        activeWallets: getDemoWallets(z.name)
       }));
       setZones(augmented);
       setLoading(false);
     });
   }, []);
 
-  // Format points for the globe
-  const points = useMemo(
-    () =>
-      zones.map((z) => ({
-        ...z,
-        // Logarithmic scaling for size based on volume, clamped
-        size: Math.max(0.3, Math.min(1.2, Math.log(z.volume) / 15)),
-        color: '#14f195', // Solana Green
-      })),
-    [zones]
-  );
 
-  // Handle Resize triggers
   useEffect(() => {
-    const handleResize = () => {
-        if (globeRef.current) {
-            globeRef.current.controls().autoRotate = !hoveredNode;
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        setDimensions({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight
+        });
+      }
+      if (globeRef.current) globeRef.current.controls().update();
+    };
+
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    
+    // Keyboard Shortcut: Escape to close
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && isExpanded) {
+            handleDeExpand();
         }
     };
-    window.dispatchEvent(new Event('resize'));
-    return handleResize;
-  }, [isExpanded, hoveredNode]);
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+        window.removeEventListener('resize', updateDimensions);
+        window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleDeExpand, isExpanded]);
 
-  // Camera Logic
   useEffect(() => {
     const g = globeRef.current;
     if (!g || loading) return;
     
-    // Animate view
-    g.pointOfView({ lat: 20, lng: 20, altitude: isExpanded ? 1.8 : 2.3 }, 1000);
-    
     const ctrl = g.controls();
-    if (ctrl) {
-      ctrl.autoRotate = true;
-      ctrl.autoRotateSpeed = 0.5;
-      ctrl.enableZoom = isExpanded;
-      ctrl.dampingFactor = 0.1;
+    
+    // Logic: 
+    // If Selected: Lock rotation, Zoom in close.
+    // If Hovered (but not selected): Pause rotation, do NOT change zoom (avoids jumpiness).
+    // If Idle: Auto rotate, default zoom.
+    
+    if (selectedNode) {
+        ctrl.autoRotate = false;
+        g.pointOfView({ lat: selectedNode.lat, lng: selectedNode.lng, altitude: 1.5 }, 1000);
+    } else if (hoveredNode) {
+        ctrl.autoRotate = false;
+        // Do NOT set pointOfView here, allows user to hover without camera jumping
+    } else {
+        ctrl.autoRotate = true;
+        ctrl.autoRotateSpeed = 0.5;
+        // Only reset view if we are completely idle and not manually moving
+        // (Optional: can add a "reset view" timeout if needed, but usually better to leave it)
     }
-  }, [loading, isExpanded]);
+
+  }, [selectedNode, hoveredNode, loading]);
 
   return (
     <div 
+        ref={containerRef}
         className={clsx(
-            "transition-all duration-500 ease-in-out relative overflow-hidden bg-[#080808] border border-white/10 group",
+            "relative overflow-hidden bg-[#050505] transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]",
             isExpanded 
-            ? "fixed inset-0 z-50 h-screen w-screen rounded-none" 
-            : "w-full h-[400px] rounded-3xl"
+            ? "fixed inset-0 z-100 h-screen w-screen" // High Z-Index to cover everything
+            : "w-full h-full"
         )}
     >
       
       {/* Header Overlay */}
-      <div className="absolute top-6 left-6 z-20 flex flex-col gap-2 pointer-events-none">
-        <h3 className="text-white font-bold flex items-center gap-2 bg-black/60 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 pointer-events-auto">
+      <div className="absolute top-6 left-6 z-40 flex flex-col gap-2 pointer-events-none">
+        <h3 className="text-white font-bold flex items-center gap-2 bg-black/60 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 pointer-events-auto shadow-xl">
           <span className="w-2 h-2 bg-brand-green rounded-full animate-pulse shadow-[0_0_10px_#14f195]" />
-          Active Zones
+          {selectedNode ? 'Zone Selected' : 'Active Zones'}
         </h3>
         {loading && <span className="text-xs text-gray-500 ml-2 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin"/> Syncing Polymarket...</span>}
       </div>
 
-      {/* Expand/Collapse Button */}
-      <button 
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="absolute top-6 right-6 z-20 p-2 bg-black/60 hover:bg-white/10 border border-white/10 rounded-full text-white transition-colors backdrop-blur-md pointer-events-auto"
-      >
-        {isExpanded ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-      </button>
+      {/* Close / Expand Controls */}
+      <div className="absolute top-6 right-6 z-50 flex gap-2">
+          {/* Instructions Hint (Only visible when expanded) */}
+          {isExpanded && (
+            <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-xs text-gray-400 mr-2">
+                <span>Press <kbd className="bg-white/10 px-1 rounded">Esc</kbd> to exit</span>
+            </div>
+          )}
 
-      {/* --- Hover Tooltip Card --- */}
-      {hoveredNode && (
+          <button 
+            onClick={(e) => {
+                e.stopPropagation();
+                // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+                isExpanded ? handleDeExpand() : setIsExpanded(true);
+            }}
+            className="p-3 bg-black/60 hover:bg-white/20 border border-white/20 rounded-full text-white transition-all backdrop-blur-md shadow-xl cursor-pointer group"
+          >
+            {isExpanded ? (
+                <X size={24} className="group-hover:scale-90 transition-transform" /> 
+            ) : (
+                <Maximize2 size={24} className="group-hover:scale-110 transition-transform" />
+            )}
+          </button>
+      </div>
+
+      {/* --- Active Node Card (Persistent if Selected, Transient if Hovered) --- */}
+      {activeNode && (
         <div 
-            className="absolute z-30 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 md:translate-x-0 md:translate-y-0 md:top-24 md:left-auto md:right-8 w-72 bg-black/80 backdrop-blur-xl border border-brand-green/30 rounded-xl p-4 shadow-[0_0_30px_rgba(20,241,149,0.1)] pointer-events-auto animate-in fade-in zoom-in-95 duration-200"
+            // If selected, prevent clicks from bubbling to globe (which would deselect)
+            onClick={(e) => e.stopPropagation()}
+            className={clsx(
+                "absolute z-40 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 md:translate-x-0 md:translate-y-0 md:top-28 md:left-auto md:right-8 w-80 bg-black/90 backdrop-blur-xl border rounded-2xl p-5 shadow-[0_0_50px_rgba(20,241,149,0.15)] pointer-events-auto transition-all duration-300",
+                selectedNode ? "border-brand-green ring-1 ring-brand-green/50 scale-100 opacity-100" : "border-white/10 scale-95 opacity-90"
+            )}
         >
-          <div className="flex justify-between items-start mb-2">
+          {/* Close selection button (only if selected) */}
+          {selectedNode && (
+              <button 
+                onClick={() => setSelectedNode(null)}
+                className="absolute top-2 right-2 p-1 hover:bg-white/10 rounded-full text-gray-500 hover:text-white transition-colors"
+              >
+                  <X size={14} />
+              </button>
+          )}
+
+          <div className="flex justify-between items-start mb-3">
             <div>
-              <h4 className="font-bold text-lg text-white leading-tight">{hoveredNode.name}</h4>
-              <p className="text-xs text-brand-green uppercase tracking-wider font-mono mt-1">
-                Vol: ${(hoveredNode.volume / 1000).toFixed(1)}k
+              <h4 className="font-bold text-xl text-white leading-tight pr-4">{activeNode.name}</h4>
+              <p className="text-xs text-brand-green uppercase tracking-wider font-mono mt-1 font-bold">
+                Vol: ${(activeNode.volume / 1000).toFixed(1)}k
               </p>
             </div>
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-ping mt-1" />
+            {/* Ping animation only for active live zones */}
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-ping mt-2 shrink-0" />
           </div>
 
-          <div className="space-y-3 mt-4">
+          <div className="space-y-4 mt-4">
              {/* Wallets Section */}
-             <div>
-                <p className="text-xs text-gray-400 mb-1 flex items-center gap-1">
-                    <Wallet size={12} /> Verified Relief Wallets
+             <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-2 flex items-center gap-1">
+                    <Wallet size={10} /> Verified Relief Wallets
                 </p>
-                <div className="flex flex-wrap gap-1">
-                    {hoveredNode.activeWallets.map((w: string) => (
-                        <span key={w} className="text-[10px] bg-white/10 px-2 py-1 rounded text-white border border-white/5">
+                <div className="flex flex-wrap gap-2">
+                    {activeNode.activeWallets.map((w: string) => (
+                        <span key={w} className="text-xs bg-brand-green/10 text-brand-green px-2 py-1 rounded border border-brand-green/20 font-mono">
                             {w}
                         </span>
                     ))}
                 </div>
              </div>
 
-             {/* Ground News Link */}
-             <a 
-                href={`https://ground.news/search?q=${encodeURIComponent(hoveredNode.searchQuery)}`}
-                target="_blank" 
-                rel="noreferrer"
-                className="block w-full text-center py-2 bg-brand-green/10 hover:bg-brand-green/20 border border-brand-green/50 rounded-lg text-brand-green text-xs font-bold transition-colors items-center justify-center gap-2"
-             >
-                Verify on Ground News <ExternalLink size={12} />
-             </a>
-             
-             {/* Original Source Link */}
-             <a 
-                href={hoveredNode.url}
-                target="_blank" 
-                rel="noreferrer"
-                className="block text-[10px] text-gray-500 hover:text-white text-center"
-             >
-                View Prediction Market Source
-             </a>
+             {/* Action Buttons */}
+             <div className="grid grid-cols-1 gap-2">
+                <a 
+                    href={`https://ground.news/search?q=${encodeURIComponent(activeNode.searchQuery)}`}
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-3 bg-brand-green hover:bg-brand-green/90 text-black rounded-lg text-xs font-bold transition-all shadow-lg hover:shadow-brand-green/20"
+                >
+                    Verify on Ground News <ExternalLink size={12} />
+                </a>
+                
+                <a 
+                    href={activeNode.url}
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-2 text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                    Source: Polymarket Oracle
+                </a>
+             </div>
           </div>
         </div>
       )}
@@ -166,10 +245,10 @@ export function LiveMap() {
       {/* --- The Globe --- */}
       <Globe
         ref={globeRef}
-        width={undefined}
-        height={undefined}
+        width={dimensions.width}
+        height={dimensions.height}
+        
         backgroundColor="#050505"
-        // High contrast night map for better visibility of green points
         globeImageUrl="//unpkg.com/three-globe/example/img/earth-night.jpg"
         bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
         
@@ -178,35 +257,42 @@ export function LiveMap() {
         pointLng="lng"
         pointAltitude="size"
         pointColor="color"
-        pointRadius={0.4}
+        pointRadius={0.5}
+        pointResolution={10}
         
         // Atmosphere
         atmosphereColor="#14f195"
-        atmosphereAltitude={0.2}
+        atmosphereAltitude={0.15}
 
         // Interaction
-        onPointHover={setHoveredNode}
-        onPointClick={(node: any) => {
-            if (node) {
-                globeRef.current?.pointOfView({ lat: node.lat, lng: node.lng, altitude: 1.5 }, 1000);
+        onPointHover={(node: any) => {
+            // Only update hover state if we haven't locked a selection
+            // Or if we have, we allow hovering other nodes but the card won't change unless clicked
+            // Actually, simpler UX: Hover always updates 'hoveredNode', but UI prefers 'selectedNode'
+            setHoveredNode(node);
+            
+            // If hovering over nothing, and we have a selection, keep cursor pointer
+            if (document.body) {
+                document.body.style.cursor = node ? 'pointer' : 'default';
             }
         }}
+        onPointClick={(node: any) => {
+            if (node) {
+                setSelectedNode(node); // Locks the card
+            } else {
+                setSelectedNode(null); // Clicking background deselects
+            }
+        }}
+        // Click background to deselect
+        onGlobeClick={() => setSelectedNode(null)}
       />
 
-      {/* Footer Overlay (Hide when expanded for cleaner look) */}
-      {!isExpanded && (
-        <div className="absolute bottom-0 inset-x-0 p-3 border-t border-white/10 bg-black/70 backdrop-blur-sm flex justify-between items-center text-xs text-gray-400">
-            <div className="flex gap-4 overflow-x-auto no-scrollbar mask-linear-fade max-w-[70%]">
-            {zones.slice(0, 4).map((z) => (
-                <div key={z.id} className="flex items-center gap-1 whitespace-nowrap">
-                <span className="w-1 h-1 bg-brand-green rounded-full" /> 
-                {z.name.length > 20 ? z.name.substring(0, 20) + '...' : z.name}
-                </div>
-            ))}
-            </div>
-            <div className="flex items-center gap-2 text-brand-green whitespace-nowrap font-mono">
-            <Zap size={14} /> Live Oracle
-            </div>
+      {/* Footer Instructions (Changes based on state) */}
+      {!isExpanded && !selectedNode && (
+        <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
+            <span className="text-xs text-gray-500 bg-black/50 px-3 py-1 rounded-full border border-white/5 backdrop-blur-sm">
+                Click a zone to view details & verify
+            </span>
         </div>
       )}
     </div>
