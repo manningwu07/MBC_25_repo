@@ -1,18 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useEffect, useState } from 'react';
 import { PrivyProvider } from '@privy-io/react-auth';
 import { toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
+import { useEffect, useState } from 'react';
 
-/**
- * Devnet "chain" description.
- * NOTE: Privy's Chain typing expects a very specific shape.
- * Casting to `any` here keeps TypeScript happy for our dev/test flow.
- * Replace the `as any` casts with the library's Chain type in prod.
- */
 const solanaDevnet = {
-  id: 101, // numeric id to avoid TS complaints (arbitrary non-conflicting number)
+  id: 'solana-devnet',
   network: 'solana-devnet',
   name: 'Solana Devnet',
   nativeCurrency: { name: 'Solana', symbol: 'SOL', decimals: 9 },
@@ -23,8 +17,9 @@ const solanaDevnet = {
   blockExplorers: {
     default: { name: 'Solana Explorer', url: 'https://explorer.solana.com/?cluster=devnet' },
   },
-} as any;
+};
 
+// Make sure this is outside the component to avoid re-initialization
 const solanaConnectors = toSolanaWalletConnectors({
   shouldAutoConnect: true,
 });

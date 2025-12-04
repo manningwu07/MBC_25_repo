@@ -48,7 +48,7 @@ export default function NgoDashboard() {
     };
 
     // 3. Handle Withdrawal
-    const handleWithdraw = async (contractId: string, maxBalance: number) => {
+    const handleWithdraw = async (contractId: string, maxBalance: number, contractName: string) => {
         const amountStr = withdrawAmount[contractId];
         if (!amountStr) return;
         const amount = parseFloat(amountStr);
@@ -63,7 +63,7 @@ export default function NgoDashboard() {
             // Here is where you would normally invoke the wallet signature
             // await signTransaction(...) 
 
-            await withdrawFromContract(contractId, amount);
+            await withdrawFromContract(contractId, amount, contractName, user?.wallet?.address || "Unknown");
 
             // Clear input and refresh
             setWithdrawAmount(prev => ({ ...prev, [contractId]: '' }));
@@ -174,7 +174,7 @@ export default function NgoDashboard() {
                                                         className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white font-mono text-sm focus:border-[#14F195] outline-none transition-colors"
                                                     />
                                                     <Button
-                                                        onClick={() => handleWithdraw(contract.id, contract.balance)}
+                                                        onClick={() => handleWithdraw(contract.id, contract.balance, contract.name)}
                                                         disabled={processingId === contract.id}
                                                         className="bg-white text-black hover:bg-gray-200 font-bold"
                                                     >

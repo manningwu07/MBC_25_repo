@@ -1,4 +1,5 @@
 // lib/smart-contracts.ts
+import { CAUSES } from "./causes";
 
 export interface FundContract {
   id: string;
@@ -8,41 +9,33 @@ export interface FundContract {
   whitelist: string[]; // List of authorized wallet addresses
 }
 
-// Initial "On-Chain" State
-const INITIAL_CONTRACTS: FundContract[] = [
-  {
-    id: 'ukraine-fund',
-    name: 'Ukraine Crisis Fund',
-    address: '9gb3vHPq52Z9nc9CMTNcxcqvUMLLEhor8KU3qMVKMEJK', // Your generated Fund Wallet
-    balance: 1450.5,
-    whitelist: ['2ypyDnf2zU8DgMtW8Urjv7G1ZddAAANjRK1WyL7QxLDv'] // Your generated NGO Wallet
-  },
-  {
-    id: 'gaza-relief',
-    name: 'Gaza Relief Wallet',
-    address: '8xP2...9z1A',
-    balance: 890.2,
-    whitelist: []
-  },
-  {
-    id: 'clean-water',
-    name: 'Clean Water Initiative',
-    address: 'C4k1...1b2D',
-    balance: 3200.0,
-    whitelist: []
-  }
-];
+export interface ContractTransaction {
+    id: string;
+    contractId: string;
+    contractName: string;
+    amount: number; 
+    to: string;
+    timestamp: number;
+    status: 'Success' | 'Pending';
+}
 
-// Helper to get state (simulates fetching accounts)
+// Convert CAUSES to Contract State
+const INITIAL_CONTRACTS: FundContract[] = CAUSES.map(c => ({
+    id: c.id,
+    name: c.name,
+    address: c.wallet_address,
+    balance: c.usdc_raised,
+    whitelist: []
+}));
+
 export const getContracts = (): FundContract[] => {
-  if (typeof window === 'undefined') return INITIAL_CONTRACTS;
-  
-  const stored = localStorage.getItem('mock_contracts_state');
-  if (!stored) {
-    localStorage.setItem('mock_contracts_state', JSON.stringify(INITIAL_CONTRACTS));
-    return INITIAL_CONTRACTS;
-  }
-  return JSON.parse(stored);
+    if (typeof window === 'undefined') return INITIAL_CONTRACTS;
+    const stored = localStorage.getItem('mock_contracts_state');
+    if (!stored) {
+      localStorage.setItem('mock_contracts_state', JSON.stringify(INITIAL_CONTRACTS));
+      return INITIAL_CONTRACTS;
+    }
+    return JSON.parse(stored);
 };
 
 // Helper to whitelist a user (simulates 'add_ngo' instruction)
@@ -60,15 +53,45 @@ export const joinContract = async (contractId: string, walletAddress: string) =>
 };
 
 // Helper to withdraw (simulates 'withdraw_fund' instruction)
-export const withdrawFromContract = async (contractId: string, amount: number) => {
-  const contracts = getContracts();
-  const updated = contracts.map(c => {
-    if (c.id === contractId) {
-      return { ...c, balance: c.balance - amount };
-    }
-    return c;
-  });
-  localStorage.setItem('mock_contracts_state', JSON.stringify(updated));
-  await new Promise(r => setTimeout(r, 2000)); // Fake network delay
-  return updated;
+export const withdrawFromContract = async (contractId: string, amount: number, contractName: string, toAddress: string) => {
+    const contracts = getContracts();
+    const updated = contracts.map(c => {
+      if (c.id === contractId) {
+        return { ...c, balance: c.balance - amount };
+      }
+      return c;
+    });
+    localStorage.setItem('mock_contracts_state', JSON.stringify(updated));
+    
+    // Record the Log
+    recordTransaction(contractId, contractName, amount, toAddress);
+    
+    await new Promise(r => setTimeout(r, 2000));
+    return updated;
+};
+
+// Transactions:
+export const getTransactions = (): ContractTransaction[] => {
+    if (typeof window === 'undefined') return [];
+    const stored = localStorage.getItem('mock_txs');
+    return stored ? JSON.parse(stored) : [];
+};
+
+export const recordTransaction = (
+    contractId: string, 
+    contractName: string, 
+    amount: number, 
+    toAddress: string
+) => {
+    const txs = getTransactions();
+    const newTx: ContractTransaction = {
+        id: Math.random().toString(36).substring(7),
+        contractId,
+        contractName,
+        amount,
+        to: toAddress,
+        timestamp: Date.now(),
+        status: 'Success'
+    };
+    localStorage.setItem('mock_txs', JSON.stringify([newTx, ...txs]));
 };
