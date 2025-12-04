@@ -22,7 +22,8 @@ import {
 const connection = new Connection("https://api.devnet.solana.com");
 
 // Set to the PDA of the smartcontract
-const donationWallet = "HC8Pn99stsnYoAn2hwf5LxVxepVdwvap3mXabyca3skD";
+// demo smart contract addr
+const donationWallet = "BCm48SATqUi4zUCgYav4KGgnpDqg1tnsLfw7i4HwGE3J";
 
 // Tutorial reccommended. 
 // CAIP-2 format for Solana
