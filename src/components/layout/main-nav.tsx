@@ -24,10 +24,13 @@ export function MainNav() {
 
   // Detect connected wallet types
   // Default is set to SOL but ETH is also supported
-  const solanaWallet = user?.wallet || wallets.find((w: any) => w.type === 'solana');
+  const solanaWallet = (user?.wallet?.chainType === 'solana' && user?.wallet) || wallets.find((w: any) => w.type === 'solana');
   const ethWallet = wallets.find((w: any) => w.type === 'ethereum');
 
   const displayWallet = solanaWallet || ethWallet;
+  console.log("Display Wallet", displayWallet);
+  console.log("solana`s Wallet", solanaWallet);
+  console.log("ethWallet", ethWallet);
 
   return (
     <nav className="flex justify-between items-center py-4 px-6 md:px-12 border-b border-white/5 bg-[#020410]/90 backdrop-blur-md sticky top-0 z-50">
@@ -65,7 +68,7 @@ export function MainNav() {
                 </span>
                 <span className="text-[10px] text-gray-400 uppercase">
                     <span className="text-[10px] text-gray-400 uppercase">
-                    {(displayWallet as any).type === 'ethereum'
+                    {(displayWallet as any).type === 'ethereum' || (displayWallet as any).chainType === 'ethereum'
                     ? 'Ethereum (Sepolia)'
                     : 'Solana (Devnet)'}
                 </span>

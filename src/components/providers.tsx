@@ -68,9 +68,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           logo: '/favicon.ico',
           walletChainType: 'ethereum-and-solana',
           walletList: [
-            'phantom',
             'detected_solana_wallets',
-            'detected_ethereum_wallets',
+            'phantom',
+            'detected_ethereum_wallets'
           ],
         },
         solana: {
@@ -83,7 +83,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             },
           },
         },
-        // externalWallets: { solana: { connectors: solanaConnectors } },
+        externalWallets: { solana: { connectors: solanaConnectors } },
         supportedChains: [solanaDevnet, sepolia],
         defaultChain: solanaDevnet
       }}
