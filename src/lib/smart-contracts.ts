@@ -21,11 +21,11 @@ export interface ContractTransaction {
 
 // Convert CAUSES to Contract State
 const INITIAL_CONTRACTS: FundContract[] = CAUSES.map(c => ({
-    id: c.id,
-    name: c.name,
-    address: c.wallet_address,
-    balance: c.usdc_raised,
-    whitelist: c.id === 'ukraine-aid' ? [WALLETS.RED_CROSS!] : []
+  id: c.id,
+  name: c.name,
+  address: c.wallet_address,
+  balance: c.usdc_raised,
+  whitelist: [WALLETS.RED_CROSS_ETH, WALLETS.RED_CROSS_SOL].filter((w): w is string => w !== undefined)
 }));
 
 export const getContracts = (): FundContract[] => {

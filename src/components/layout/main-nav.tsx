@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import Link from "next/link";
@@ -10,7 +11,7 @@ import Image from "next/image";
 
 export function MainNav() {
   const pathname = usePathname();
-  const { authenticated, logout, login } = usePrivy();
+  const { user, authenticated, logout, login } = usePrivy();
   const { wallets } = useWallets();
 
   const links = [
@@ -22,12 +23,9 @@ export function MainNav() {
   ];
 
   // Detect connected wallet types
-  const solanaWallet = wallets.find((w) => (w as { type: string }).type === 'solana');
-  const ethWallet = wallets.find((w) => (w as { type: string }).type === 'ethereum');
-
-  console.log("Solana Wallet", solanaWallet);
-  console.log("Ethereum Wallet", ethWallet);
-  console.log("Wallets", wallets);
+  // Default is set to SOL but ETH is also supported
+  const solanaWallet = user?.wallet || wallets.find((w: any) => w.type === 'solana');
+  const ethWallet = wallets.find((w: any) => w.type === 'ethereum');
 
   const displayWallet = solanaWallet || ethWallet;
 
@@ -66,7 +64,11 @@ export function MainNav() {
                     {displayWallet.address.slice(0, 4)}..{displayWallet.address.slice(-4)}
                 </span>
                 <span className="text-[10px] text-gray-400 uppercase">
-                    {displayWallet.walletClientType === 'ethereum' ? 'Ethereum (Sepolia)' : 'Solana (Devnet)'}
+                    <span className="text-[10px] text-gray-400 uppercase">
+                    {(displayWallet as any).type === 'ethereum'
+                    ? 'Ethereum (Sepolia)'
+                    : 'Solana (Devnet)'}
+                </span>
                 </span>
              </div>
             <Button variant="outline" onClick={logout} className="h-9 text-xs border-white/10 hover:bg-white/5">Disconnect</Button>

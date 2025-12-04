@@ -3,6 +3,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { PrivyProvider } from '@privy-io/react-auth';
 import { toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
+import {
+  createSolanaRpc,
+  createSolanaRpcSubscriptions,
+} from '@solana/kit';
 
 const solanaDevnet = {
   id: 101,
@@ -42,7 +46,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   const solanaConnectors = useMemo(
     () =>
       toSolanaWalletConnectors({
-        shouldAutoConnect: true,
+        shouldAutoConnect: false,
       }),
     []
   );
@@ -58,32 +62,30 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || 'insert-privy-app-id'}
       config={{
-        loginMethods: ['email', 'wallet'],
         appearance: {
           theme: 'dark',
           accentColor: '#14f195',
           logo: '/favicon.ico',
-          showWalletLoginFirst: true,
-          //New: Explicitly set to support both chains
           walletChainType: 'ethereum-and-solana',
           walletList: [
-            'detected_solana_wallets',
             'phantom',
-            'solflare',
-            'backpack',
+            'detected_solana_wallets',
             'detected_ethereum_wallets',
-            'metamask',
-            'wallet_connect',
           ],
         },
-        externalWallets: {
-          solana: {
-            connectors: solanaConnectors,
+        solana: {
+          rpcs: {
+            'solana:devnet': {
+              rpc: createSolanaRpc('https://api.devnet.solana.com'),
+              rpcSubscriptions: createSolanaRpcSubscriptions(
+                'wss://api.devnet.solana.com'
+              ),
+            },
           },
         },
-        //New: Support both networks
+        // externalWallets: { solana: { connectors: solanaConnectors } },
         supportedChains: [solanaDevnet, sepolia],
-        defaultChain: solanaDevnet,
+        defaultChain: solanaDevnet
       }}
     >
       {children}

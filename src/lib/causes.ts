@@ -2,7 +2,9 @@
 
 export const WALLETS = {
   // Org Wallets
-  RED_CROSS: process.env.NEXT_PUBLIC_RED_CROSS,
+  RED_CROSS_ETH: process.env.NEXT_PUBLIC_RED_CROSS_ETH,
+  RED_CROSS_SOL: process.env.NEXT_PUBLIC_RED_CROSS_SOL,
+
 
   // Fund Wallets
   UKRAINE_FUND: process.env.NEXT_PUBLIC_UKRAINE_FUND,

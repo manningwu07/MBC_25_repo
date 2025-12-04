@@ -35,20 +35,12 @@ export function DonationModal({ isOpen, onClose, recipientName, recipientAddress
   const [txHash, setTxHash] = useState<string>("");
   const [bridgeStep, setBridgeStep] = useState<string>("");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const solWallet = wallets.find((w: any) => w.chainType === 'solana' || w.type == 'solana');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ethWallet = wallets.find((w: any) => w.chainType === 'ethereum' || w.type == 'ethereum');
+  const solWallet = wallets.find((w: any) => w.type === 'solana');
+  const ethWallet = wallets.find((w: any) => w.type === 'ethereum');
 
   console.log("Donate Solana Wallet", solWallet);
   console.log("Donate Ethereum Wallet", ethWallet);
   console.log("Donate Wallets", wallets);
-
-  useEffect(() => {
-    if (!solWallet && ethWallet && !currency.includes('ETH')) {
-        setCurrency('ETH');
-    }
-  }, [solWallet, ethWallet, currency]);
 
   if (!isOpen) return null;
 
