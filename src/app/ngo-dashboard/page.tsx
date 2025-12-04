@@ -7,7 +7,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2, ShieldCheck, Download, Plus, Wallet, AlertCircle } from 'lucide-react';
 import { FundContract, getContracts, joinContract, withdrawFromContract } from '~/lib/smart-contracts';
 import { motion, AnimatePresence } from 'framer-motion';
-import router from 'next/router';
 
 export default function NgoDashboard() {
     const { user, authenticated } = usePrivy();

@@ -1,5 +1,5 @@
 // lib/smart-contracts.ts
-import { CAUSES } from "./causes";
+import { CAUSES, WALLETS } from "./causes";
 
 export interface FundContract {
   id: string;
@@ -25,7 +25,7 @@ const INITIAL_CONTRACTS: FundContract[] = CAUSES.map(c => ({
     name: c.name,
     address: c.wallet_address,
     balance: c.usdc_raised,
-    whitelist: []
+    whitelist: c.id === 'ukraine-aid' ? [WALLETS.RED_CROSS!] : []
 }));
 
 export const getContracts = (): FundContract[] => {
@@ -53,21 +53,32 @@ export const joinContract = async (contractId: string, walletAddress: string) =>
 };
 
 // Helper to withdraw (simulates 'withdraw_fund' instruction)
-export const withdrawFromContract = async (contractId: string, amount: number, contractName: string, toAddress: string) => {
+export const withdrawFromContract = async (contractId: string, amount: number, requesterAddress: string, p0: string) => {
     const contracts = getContracts();
+    const contract = contracts.find(c => c.id === contractId);
+
+    if (!contract) throw new Error("Contract not found");
+
+    // ---------------------------------------------------------
+    // RESTORED WHITELIST CHECK
+    // ---------------------------------------------------------
+    if (!contract.whitelist.includes(requesterAddress)) {
+        throw new Error(`ACCESS DENIED: Wallet ${requesterAddress.slice(0,6)}... is not whitelisted for ${contract.name}`);
+    }
+
+    if (amount > contract.balance) throw new Error("Insufficient funds in smart contract");
+
+    // Perform Update
     const updated = contracts.map(c => {
-      if (c.id === contractId) {
-        return { ...c, balance: c.balance - amount };
-      }
-      return c;
+        if (c.id === contractId) return { ...c, balance: c.balance - amount };
+        return c;
     });
+
+    recordTransaction(contractId, contract.name, amount, requesterAddress);
+
     localStorage.setItem('mock_contracts_state', JSON.stringify(updated));
-    
-    // Record the Log
-    recordTransaction(contractId, contractName, amount, toAddress);
-    
-    await new Promise(r => setTimeout(r, 2000));
-    return updated;
+    await new Promise(r => setTimeout(r, 1000)); // Simulate RPC delay
+    return true;
 };
 
 // Transactions:
