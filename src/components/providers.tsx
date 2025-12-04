@@ -1,12 +1,13 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { PrivyProvider } from '@privy-io/react-auth';
 import { toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
-import {
-  createSolanaRpc,
-  createSolanaRpcSubscriptions,
-} from '@solana/kit';
+import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
+import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
+import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
+import { clusterApiUrl } from '@solana/web3.js';
 
 const solanaDevnet = {
   id: 101,
@@ -42,53 +43,48 @@ const sepolia = {
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
-  //New: Memoize solana connectors with proper config
   const solanaConnectors = useMemo(
-    () =>
-      toSolanaWalletConnectors({
-        shouldAutoConnect: false,
-      }),
+    () => toSolanaWalletConnectors({ shouldAutoConnect: true }),
     []
   );
+  const solanaWallets = useMemo(() => [new PhantomWalletAdapter()], []);
+  const endpoint = useMemo(() => clusterApiUrl('devnet'), []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
   if (!mounted) return <>{children}</>;
 
   return (
-    <PrivyProvider
-      appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || 'insert-privy-app-id'}
-      config={{
-        appearance: {
-          theme: 'dark',
-          accentColor: '#14f195',
-          logo: '/favicon.ico',
-          walletChainType: 'ethereum-and-solana',
-          walletList: [
-            'detected_solana_wallets',
-            'phantom',
-            'detected_ethereum_wallets'
-          ],
-        },
-        solana: {
-          rpcs: {
-            'solana:devnet': {
-              rpc: createSolanaRpc('https://api.devnet.solana.com'),
-              rpcSubscriptions: createSolanaRpcSubscriptions(
-                'wss://api.devnet.solana.com'
-              ),
+    <ConnectionProvider endpoint={endpoint}>
+      <WalletProvider wallets={solanaWallets} autoConnect>
+        <PrivyProvider
+          appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || ''}
+          config={{
+            appearance: {
+              theme: 'dark',
+              accentColor: '#14f195',
+              logo: '/favicon.ico',
+              walletChainType: 'ethereum-and-solana',
+              walletList: ['detected_solana_wallets', 'phantom', 'detected_ethereum_wallets'],
             },
-          },
-        },
-        externalWallets: { solana: { connectors: solanaConnectors } },
-        supportedChains: [solanaDevnet, sepolia],
-        defaultChain: solanaDevnet
-      }}
-    >
-      {children}
-    </PrivyProvider>
+            solana: {
+              rpcs: {
+                'solana:devnet': {
+                  rpc: createSolanaRpc('https://api.devnet.solana.com'),
+                  rpcSubscriptions: createSolanaRpcSubscriptions('wss://api.devnet.solana.com'),
+                },
+              },
+            },
+            externalWallets: { solana: { connectors: solanaConnectors } },
+            supportedChains: [solanaDevnet, sepolia],
+            defaultChain: solanaDevnet,
+          }}
+        >
+          {children}
+        </PrivyProvider>
+      </WalletProvider>
+    </ConnectionProvider >
   );
 }
