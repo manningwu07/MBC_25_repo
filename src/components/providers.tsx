@@ -6,7 +6,7 @@ import { toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
 import { useEffect, useState } from 'react';
 
 const solanaDevnet = {
-  id: 'solana-devnet',
+  id: 101, // 101 is the numeric ID for Solana Devnet in many registries
   network: 'solana-devnet',
   name: 'Solana Devnet',
   nativeCurrency: { name: 'Solana', symbol: 'SOL', decimals: 9 },
@@ -17,7 +17,21 @@ const solanaDevnet = {
   blockExplorers: {
     default: { name: 'Solana Explorer', url: 'https://explorer.solana.com/?cluster=devnet' },
   },
-};
+} as const;
+
+const sepolia = {
+  id: 11155111,
+  network: 'sepolia',
+  name: 'Sepolia',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://rpc.sepolia.org'] },
+    public: { http: ['https://rpc.sepolia.org'] },
+  },
+  blockExplorers: {
+    default: { name: 'Etherscan', url: 'https://sepolia.etherscan.io' },
+  },
+} as const;
 
 // Make sure this is outside the component to avoid re-initialization
 const solanaConnectors = toSolanaWalletConnectors({
@@ -51,9 +65,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             connectors: solanaConnectors,
           },
         },
-        // Dev-only: cast to `any` to satisfy types. Replace with proper Chain type later.
-        defaultChain: solanaDevnet as any,
-        supportedChains: [solanaDevnet as any],
+        supportedChains: [solanaDevnet, sepolia],
       }}
     >
       {children}

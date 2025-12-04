@@ -33,8 +33,12 @@ export function DonationModal({ isOpen, onClose, recipientName, recipientAddress
   const [stage, setStage] = useState<'idle' | 'swapping' | 'bridging' | 'confirming'>('idle');
 
   // Find active wallets
-  const solWallet = wallets.find(w => w.walletClientType === 'solana');
-  const ethWallet = wallets.find(w => w.walletClientType === 'ethereum');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const solWallet = wallets.find((w: any) => w.type === 'solana' || w.chainType === 'solana');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ethWallet = wallets.find((w: any) => w.type === 'ethereum' || w.chainType === 'ethereum');
+  console.log("Sol Wallet:", solWallet);
+  console.log("Eth Wallet:", ethWallet);
 
   // If user has connected ETH but not SOL (or vice versa), default to that
   useEffect(() => {

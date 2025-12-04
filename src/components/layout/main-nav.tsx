@@ -17,6 +17,7 @@ export function MainNav() {
     { href: "/causes", label: "Causes" },
     { href: "/ngo-signup", label: "NGO Sign-up" },
     { href: "/transparency", label: "Transparency" },
+    { href: "/about", label: "About" },
   ];
 
   // Detect connected wallet types
