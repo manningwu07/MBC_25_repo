@@ -1,16 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/components/ui/donation-modal.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, RefreshCw, ArrowRightLeft } from 'lucide-react';
+import { X, Loader2, ArrowRightLeft, CheckCircle2, ExternalLink, AlertTriangle } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { useSignAndSendTransaction } from '@privy-io/react-auth/solana';
+import { useSendTransaction } from '@privy-io/react-auth';
 import { PublicKey } from '@solana/web3.js';
 import { buildUSDCTransferTx, buildDirectSolTransfer } from '~/lib/solana/client';
-import { getUSDCConversionRate } from '~/lib/circle';
 import { clsx } from 'clsx';
+import { initiateCCTPBridge, pollForAttestation } from '~/lib/circle';
 
 interface DonationModalProps {
   isOpen: boolean;
@@ -20,131 +20,208 @@ interface DonationModalProps {
   causeId: string;
 }
 
-type Currency = 'SOL' | 'ETH' | 'USDC_SOL' | 'USDC_ETH';
+type Currency = 'SOL' | 'ETH' | 'USDC_SOL';
 
 export function DonationModal({ isOpen, onClose, recipientName, recipientAddress }: DonationModalProps) {
-  const { user } = usePrivy();
+  const { connectWallet } = usePrivy();
   const { wallets } = useWallets();
-  const { signAndSendTransaction } = useSignAndSendTransaction();
+  const { signAndSendTransaction: signSolana } = useSignAndSendTransaction();
+  const { sendTransaction: sendEther } = useSendTransaction();
   
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<Currency>('USDC_SOL');
   const [loading, setLoading] = useState(false);
-  const [stage, setStage] = useState<'idle' | 'swapping' | 'bridging' | 'confirming'>('idle');
+  const [stage, setStage] = useState<'idle' | 'swapping' | 'bridging' | 'confirming' | 'success'>('idle');
+  const [txHash, setTxHash] = useState<string>("");
+  const [bridgeStep, setBridgeStep] = useState<string>("");
 
-  // Find active wallets
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const solWallet = wallets.find((w: any) => w.type === 'solana' || w.chainType === 'solana');
+  const solWallet = wallets.find((w: any) => w.chainType === 'solana' || w.type == 'solana');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ethWallet = wallets.find((w: any) => w.type === 'ethereum' || w.chainType === 'ethereum');
-  console.log("Sol Wallet:", solWallet);
-  console.log("Eth Wallet:", ethWallet);
+  const ethWallet = wallets.find((w: any) => w.chainType === 'ethereum' || w.type == 'ethereum');
 
-  // If user has connected ETH but not SOL (or vice versa), default to that
+  console.log("Donate Solana Wallet", solWallet);
+  console.log("Donate Ethereum Wallet", ethWallet);
+  console.log("Donate Wallets", wallets);
+
   useEffect(() => {
-    if(!solWallet && ethWallet) setCurrency('ETH');
-  }, [solWallet, ethWallet]);
+    if (!solWallet && ethWallet && !currency.includes('ETH')) {
+        setCurrency('ETH');
+    }
+  }, [solWallet, ethWallet, currency]);
 
   if (!isOpen) return null;
+
+  const handleClose = () => {
+    setStage('idle');
+    setTxHash("");
+    setAmount("");
+    setBridgeStep("");
+    onClose();
+  }
 
   const handleDonate = async () => {
     if (!amount) return;
     setLoading(true);
+    setTxHash("");
+    setBridgeStep("");
 
     try {
         const amtNum = parseFloat(amount);
+        let signature = "";
 
-        // ----------------------------------------------------
-        // FLOW 1: SOLANA NATIVE (USDC or SOL)
-        // ----------------------------------------------------
+        // ------------------------------------
+        // FLOW 1: SOLANA NATIVE
+        // ------------------------------------
         if (currency === 'USDC_SOL' || currency === 'SOL') {
-            if(!solWallet) throw new Error("No Solana wallet connected");
-            
-            // If user selects SOL, we assume a "Swap" happens via Circle logic backend
-            // In reality, for this hackathon on Devnet, we will just send SOL and log the swap
+            if(!solWallet) throw new Error("Please connect a Solana wallet.");
             setStage('confirming');
+
+            if (!recipientAddress || recipientAddress.length < 32) throw new Error("Invalid recipient address.");
+            const fromPubkey = new PublicKey(solWallet.address);
+            const toPubkey = new PublicKey(recipientAddress);
 
             const tx = currency === 'USDC_SOL' 
-                ? await buildUSDCTransferTx(new PublicKey(solWallet.address), amtNum, new PublicKey(recipientAddress))
-                : await buildDirectSolTransfer(new PublicKey(solWallet.address), amtNum, new PublicKey(recipientAddress));
-            
-            // @ts-expect-error - Privy types need explicit casting sometimes
-            await signAndSendTransaction({ transaction: tx.serialize(), wallet: solWallet });
-            
+                ? await buildUSDCTransferTx(fromPubkey, amtNum, toPubkey)
+                : await buildDirectSolTransfer(fromPubkey, amtNum, toPubkey);
+            // @ts-expect-error Privy types vary
+            const receipt = await signSolana({ transaction: tx, wallet: solWallet });
+            // @ts-expect-error Privy types vary
+            signature = receipt.signature || receipt; 
         } 
         
-        // ----------------------------------------------------
-        // FLOW 2: ETHEREUM CCTP (Simulated)
-        // ----------------------------------------------------
+        // ------------------------------------
+        // FLOW 2: REAL CIRCLE CCTP (Sepolia -> Solana)
+        // ------------------------------------
         else {
-            if(!ethWallet) throw new Error("No Ethereum wallet connected");
-            
-            // 1. Simulate "Burn" on Source Chain
-            setStage('swapping'); // Pretend to swap ETH to USDC first if needed
-            await new Promise(r => setTimeout(r, 1500)); 
-
-            setStage('bridging'); // Simulate Circle CCTP
-            // In a real app, this would call Circle's Attestation API
-            await new Promise(r => setTimeout(r, 2000));
+            if(!ethWallet) throw new Error("Please connect an Ethereum wallet.");
             
             setStage('confirming');
-            // Normally we would ask user to sign the "Mint" on destination, 
-            // but for this demo, we assume the Relayer handles it.
-            await new Promise(r => setTimeout(r, 1000));
+            setBridgeStep("Sign transaction to Burn USDC on Sepolia...");
             
-            alert(`Successfully bridged ${amount} via Circle CCTP to Solana!`);
+            const burnTxHash = await initiateCCTPBridge(
+                ethWallet, 
+                sendEther, 
+                amtNum, 
+                recipientAddress 
+            );
+
+            setTxHash(burnTxHash);
+            setBridgeStep("USDC Burned. Waiting for Circle Attestation...");
+            setStage('bridging');
+
+            await pollForAttestation(burnTxHash);
+            
+            setBridgeStep("Attestation verified via Circle Iris.");
+            signature = burnTxHash; 
         }
 
-        onClose();
+        setTxHash(signature);
+        setStage('success');
+
     } catch (e: any) {
-        console.error(e);
-        alert("Transaction Failed: " + (e.message || "Unknown error"));
+        console.error("Donation Error:", e);
+        const msg = e.message || "Transaction failed";
+        alert(msg.includes("rejected") ? "Transaction cancelled." : "Error: " + msg);
     } finally {
         setLoading(false);
-        setStage('idle');
     }
   };
 
-  const getEstUSDC = () => {
-     const amt = parseFloat(amount || "0");
-     if(currency === 'SOL') return (amt * 145).toFixed(2);
-     if(currency === 'ETH') return (amt * 2200).toFixed(2);
-     return amt.toFixed(2);
-  };
+  if (stage === 'success') {
+    return (
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+            <div className="bg-[#11131F] border border-[#14F195]/30 w-full max-w-md rounded-2xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-200">
+                <div className="w-20 h-20 bg-[#14F195]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle2 size={40} className="text-[#14F195]" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Donation Sent!</h2>
+                <p className="text-gray-400 mb-6">
+                    {currency === 'ETH' 
+                        ? "USDC Burned on Sepolia & Verified by Circle Iris API." 
+                        : "Funds transferred on Solana Devnet."}
+                </p>
+                <div className="bg-black/50 p-4 rounded-xl border border-white/10 mb-6 text-left">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Transaction Hash</p>
+                    <div className="flex items-center justify-between">
+                        <code className="text-[#14F195] text-xs font-mono truncate max-w-[250px]">{txHash}</code>
+                        <a 
+                             href={currency === 'ETH' ? `https://sepolia.etherscan.io/tx/${txHash}` : `https://explorer.solana.com/tx/${txHash}?cluster=devnet`}
+                            target="_blank" rel="noreferrer"
+                            className="text-gray-400 hover:text-white"
+                        >
+                            <ExternalLink size={14}/>
+                        </a>
+                    </div>
+                </div>
+                <Button onClick={handleClose} className="w-full bg-[#14F195] text-black font-bold">Close</Button>
+            </div>
+        </div>
+    );
+  }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <div className="bg-[#11131F] border border-white/10 w-full max-w-md rounded-2xl p-6 shadow-2xl relative overflow-hidden">
         
-        {/* Header */}
         <div className="flex justify-between items-start mb-6">
             <div>
                 <h3 className="text-xl font-bold text-white">Donate to {recipientName}</h3>
-                <p className="text-xs text-blue-400 font-mono mt-1">Via Circle Payments Network</p>
+                <p className="text-xs text-blue-400 font-mono mt-1">Via Circle CCTP & Solana</p>
             </div>
-            <button onClick={onClose} className="text-gray-500 hover:text-white"><X size={20} /></button>
+            <button onClick={handleClose} className="text-gray-500 hover:text-white"><X size={20} /></button>
         </div>
 
-        {/* Currency Tabs */}
         <div className="flex gap-2 mb-4 p-1 bg-black rounded-lg">
-            {solWallet && (
-                <>
-                <button onClick={() => setCurrency('USDC_SOL')} className={clsx("flex-1 py-2 text-xs font-bold rounded-md transition-colors", currency === 'USDC_SOL' ? "bg-[#2775CA] text-white" : "text-gray-500 hover:text-white")}>
-                    USDC (Sol)
-                </button>
-                <button onClick={() => setCurrency('SOL')} className={clsx("flex-1 py-2 text-xs font-bold rounded-md transition-colors", currency === 'SOL' ? "bg-[#14F195] text-black" : "text-gray-500 hover:text-white")}>
-                    SOL
-                </button>
-                </>
-            )}
-            {ethWallet && (
-                 <button onClick={() => setCurrency('ETH')} className={clsx("flex-1 py-2 text-xs font-bold rounded-md transition-colors", currency === 'ETH' ? "bg-purple-500 text-white" : "text-gray-500 hover:text-white")}>
-                    ETH (Sepolia)
-                 </button>
-            )}
+            {/* Show all buttons, disable if wallet missing but user can click to switch logic */}
+            <button 
+                onClick={() => setCurrency('USDC_SOL')} 
+                className={clsx("flex-1 py-2 text-xs font-bold rounded-md transition-colors", currency === 'USDC_SOL' ? "bg-[#2775CA] text-white" : "text-gray-500 hover:text-white", !solWallet && currency !== 'USDC_SOL' && "opacity-50")}
+            >
+                USDC (Sol)
+            </button>
+            <button 
+                onClick={() => setCurrency('SOL')} 
+                className={clsx("flex-1 py-2 text-xs font-bold rounded-md transition-colors", currency === 'SOL' ? "bg-[#14F195] text-black" : "text-gray-500 hover:text-white", !solWallet && currency !== 'SOL' && "opacity-50")}
+            >
+                SOL
+            </button>
+            <button 
+                onClick={() => setCurrency('ETH')} 
+                className={clsx("flex-1 py-2 text-xs font-bold rounded-md transition-colors", currency === 'ETH' ? "bg-purple-500 text-white" : "text-gray-500 hover:text-white", !ethWallet && currency !== 'ETH' && "opacity-50")}
+            >
+                ETH
+            </button>
         </div>
 
-        {/* Input */}
+        {/* --- DYNAMIC WARNINGS --- */}
+        {currency.includes('SOL') && !solWallet && (
+            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex gap-3 cursor-pointer" onClick={connectWallet}>
+                <AlertTriangle className="text-yellow-400 shrink-0" size={16} />
+                <p className="text-[10px] text-yellow-200">
+                    Solana wallet missing. Click here to connect.
+                </p>
+            </div>
+        )}
+
+        {currency === 'ETH' && !ethWallet && (
+             <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex gap-3 cursor-pointer" onClick={connectWallet}>
+                <AlertTriangle className="text-yellow-400 shrink-0" size={16} />
+                <p className="text-[10px] text-yellow-200">
+                    Ethereum wallet missing. Click here to connect.
+                </p>
+            </div>
+        )}
+
+        {currency === 'ETH' && ethWallet && (
+            <div className="mb-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg flex gap-3">
+                <AlertTriangle className="text-purple-400 shrink-0" size={16} />
+                <p className="text-[10px] text-purple-200">
+                    Bridging <b>USDC</b> from Sepolia. Requires USDC + ETH for gas.
+                </p>
+            </div>
+        )}
+
         <div className="mb-6">
             <div className="relative">
                 <input 
@@ -155,47 +232,31 @@ export function DonationModal({ isOpen, onClose, recipientName, recipientAddress
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-2xl font-mono text-white outline-none focus:border-blue-500 transition-colors"
                 />
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">
-                    {currency.split('_')[0]}
+                    {currency.includes('USDC') || currency === 'ETH' ? 'USDC' : 'SOL'}
                 </div>
-            </div>
-            <div className="flex justify-between mt-2 px-1">
-                <span className="text-xs text-gray-500">
-                    Est. Impact: <span className="text-blue-400 font-bold">${getEstUSDC()} USDC</span>
-                </span>
-                {currency === 'ETH' && <span className="text-[10px] text-purple-400 flex items-center gap-1"><RefreshCw size={10}/> CCTP Bridge Active</span>}
             </div>
         </div>
 
-        {/* Actions */}
         <Button 
             onClick={handleDonate} 
             disabled={loading || !amount}
-            className="w-full py-6 text-lg font-bold bg-[#2775CA] hover:bg-[#2775CA]/90 text-white"
+            className={clsx("w-full py-6 text-lg font-bold text-white transition-all", currency === 'ETH' ? "bg-purple-600 hover:bg-purple-500" : "bg-[#2775CA] hover:bg-[#2775CA]/90")}
         >
             {loading ? (
-                <div className="flex items-center gap-2">
-                    <Loader2 className="animate-spin" />
-                    {stage === 'swapping' && "Swapping Assets..."}
-                    {stage === 'bridging' && "Circle CCTP Attestation..."}
-                    {stage === 'confirming' && "Finalizing Transaction..."}
+                <div className="flex flex-col items-center gap-1">
+                    <div className="flex items-center gap-2">
+                        <Loader2 className="animate-spin" size={18} />
+                        Processing...
+                    </div>
+                    {bridgeStep && <span className="text-[10px] font-normal opacity-80">{bridgeStep}</span>}
                 </div>
             ) : (
                 <div className="flex items-center gap-2">
-                   Donate Now {currency === 'ETH' && <ArrowRightLeft size={16} className="opacity-70"/>}
+                   {currency === 'ETH' ? "Bridge via CCTP" : "Donate Now"} 
+                   {currency === 'ETH' && <ArrowRightLeft size={16} className="opacity-70"/>}
                 </div>
             )}
         </Button>
-      
-        {/* Footer info */}
-        <div className="mt-4 pt-4 border-t border-white/5 text-center">
-            <p className="text-[10px] text-gray-600">
-                Powered by <span className="text-white font-bold">Circle</span>. 
-                {currency === 'ETH' 
-                    ? " Cross-chain transfers utilize Circle CCTP to mint native USDC on Solana." 
-                    : " Direct settlement via Solana High-Throughput Network."}
-            </p>
-        </div>
-
       </div>
     </div>
   );

@@ -11,7 +11,7 @@ import {
     getAssociatedTokenAddress, 
     createAssociatedTokenAccountInstruction 
 } from "@solana/spl-token";
-import { USDC_DEVNET_MINT } from "~/lib/circle";
+import { USDC_DEVNET_MINT } from "../circle";
 
 export const connection = new Connection(
   process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com",

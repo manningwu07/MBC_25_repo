@@ -1,12 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
+import React, { useEffect, useState, useMemo } from 'react';
 import { PrivyProvider } from '@privy-io/react-auth';
 import { toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
-import { useEffect, useState } from 'react';
 
 const solanaDevnet = {
-  id: 101, // 101 is the numeric ID for Solana Devnet in many registries
+  id: 101,
   network: 'solana-devnet',
   name: 'Solana Devnet',
   nativeCurrency: { name: 'Solana', symbol: 'SOL', decimals: 9 },
@@ -15,7 +14,10 @@ const solanaDevnet = {
     public: { http: ['https://api.devnet.solana.com'] },
   },
   blockExplorers: {
-    default: { name: 'Solana Explorer', url: 'https://explorer.solana.com/?cluster=devnet' },
+    default: {
+      name: 'Solana Explorer',
+      url: 'https://explorer.solana.com/?cluster=devnet',
+    },
   },
 } as const;
 
@@ -33,19 +35,21 @@ const sepolia = {
   },
 } as const;
 
-// Make sure this is outside the component to avoid re-initialization
-const solanaConnectors = toSolanaWalletConnectors({
-  shouldAutoConnect: true,
-});
-
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
+  //New: Memoize solana connectors with proper config
+  const solanaConnectors = useMemo(
+    () =>
+      toSolanaWalletConnectors({
+        shouldAutoConnect: true,
+      }),
+    []
+  );
+
   useEffect(() => {
-    // Mark mounted so we only initialize Privy on the client
-    // Schedule the state update asynchronously to avoid calling setState synchronously inside the effect
-    const id = window.setTimeout(() => setMounted(true), 0);
-    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
   }, []);
 
   if (!mounted) return <>{children}</>;
@@ -59,13 +63,27 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           theme: 'dark',
           accentColor: '#14f195',
           logo: '/favicon.ico',
+          showWalletLoginFirst: true,
+          //New: Explicitly set to support both chains
+          walletChainType: 'ethereum-and-solana',
+          walletList: [
+            'detected_solana_wallets',
+            'phantom',
+            'solflare',
+            'backpack',
+            'detected_ethereum_wallets',
+            'metamask',
+            'wallet_connect',
+          ],
         },
         externalWallets: {
           solana: {
             connectors: solanaConnectors,
           },
         },
+        //New: Support both networks
         supportedChains: [solanaDevnet, sepolia],
+        defaultChain: solanaDevnet,
       }}
     >
       {children}

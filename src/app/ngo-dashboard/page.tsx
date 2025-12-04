@@ -28,6 +28,9 @@ export default function NgoDashboard() {
         const reg = allContracts.filter(c => c.whitelist.includes(myWallet));
         const unreg = allContracts.filter(c => !c.whitelist.includes(myWallet));
 
+        console.log("All Contracts", allContracts);
+        console.log("Registered", reg);
+        console.log("myWallet", myWallet);
         setRegistered(reg);
         setOthers(unreg);
     }, [user?.wallet]);

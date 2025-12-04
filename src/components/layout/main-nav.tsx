@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "~/components/ui/button";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
+
 import { clsx } from "clsx";
 import Image from "next/image";
 
 export function MainNav() {
   const pathname = usePathname();
-  const { login, authenticated, logout } = usePrivy();
+  const { authenticated, logout, login } = usePrivy();
   const { wallets } = useWallets();
 
   const links = [
@@ -23,6 +24,10 @@ export function MainNav() {
   // Detect connected wallet types
   const solanaWallet = wallets.find((w) => (w as { type: string }).type === 'solana');
   const ethWallet = wallets.find((w) => (w as { type: string }).type === 'ethereum');
+
+  console.log("Solana Wallet", solanaWallet);
+  console.log("Ethereum Wallet", ethWallet);
+  console.log("Wallets", wallets);
 
   const displayWallet = solanaWallet || ethWallet;
 
@@ -67,7 +72,8 @@ export function MainNav() {
             <Button variant="outline" onClick={logout} className="h-9 text-xs border-white/10 hover:bg-white/5">Disconnect</Button>
           </div>
         ) : (
-          <Button onClick={login} className="bg-white text-black hover:bg-gray-200 font-bold px-6 border-none">
+          <Button onClick={login}
+              className="bg-white text-black hover:bg-gray-200 font-bold px-6 border-none">
             Connect Wallet
           </Button>
         )}
