@@ -1,148 +1,405 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// components/ui/donation-modal.tsx
 'use client';
 
 import { useState } from 'react';
-import { X, Loader2, Coins, AlertOctagon } from 'lucide-react';
+import {
+  X,
+  Loader2,
+  ArrowRightLeft,
+  CheckCircle2,
+  ExternalLink,
+  AlertTriangle,
+} from 'lucide-react';
 import { Button } from '~/components/ui/button';
-import { usePrivy, useWallets } from '@privy-io/react-auth';
-import { useSignAndSendTransaction } from '@privy-io/react-auth/solana';
-import { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
-import { buildSwapAndDonateTx, buildDonateTx } from '~/lib/solana/client';
+import { clsx } from 'clsx';
+import { PublicKey } from '@solana/web3.js';
+
+// Solana
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+
+// Ethereum
+import { useAccount, useConnect, useSendTransaction, usePublicClient } from 'wagmi';
+import { injected } from 'wagmi/connectors';
+
+// Local
+import {
+  buildUSDCTransferTx,
+  buildDirectSolTransfer,
+} from '~/lib/solana/client';
+import {
+  buildApproveData,
+  buildBurnData,
+  SEPOLIA_USDC,
+  SEPOLIA_TOKEN_MESSENGER,
+  pollForAttestation,
+} from '~/lib/circle';
 
 interface DonationModalProps {
   isOpen: boolean;
   onClose: () => void;
   recipientName: string;
   recipientAddress: string;
-  isPool: boolean; // TRUE = Smart Contract Pool, FALSE = Direct Wallet
+  causeId?: string;
 }
 
-export function DonationModal({ isOpen, onClose, recipientName, recipientAddress, isPool }: DonationModalProps) {
-  const { user } = usePrivy();
-  const { wallets } = useWallets();
-  const { signAndSendTransaction } = useSignAndSendTransaction();
-  
+type Currency = 'SOL' | 'ETH' | 'USDC_SOL';
+
+export function DonationModal({
+  isOpen,
+  onClose,
+  recipientName,
+  recipientAddress,
+}: DonationModalProps) {
   const [amount, setAmount] = useState('');
-  const [step, setStep] = useState<"input" | "confirm" | "double-confirm">("input");
+  const [currency, setCurrency] = useState<Currency>('SOL');
   const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState<
+    'idle' | 'bridging' | 'confirming' | 'success'
+  >('idle');
+  const [txHash, setTxHash] = useState<string>('');
+  const [statusMsg, setStatusMsg] = useState<string>('');
+
+  // Solana
+  const { publicKey, signTransaction, connected: solConnected } = useWallet();
+  const { connection } = useConnection();
+  const { setVisible: setSolModalVisible } = useWalletModal();
+
+  // Ethereum
+  const { address: ethAddress, isConnected: ethConnected } = useAccount();
+  const { connect: ethConnect } = useConnect();
+  const { sendTransactionAsync } = useSendTransaction();
+  const publicClient = usePublicClient();
 
   if (!isOpen) return null;
 
-  // Mock SOL price for the >$100 check
-  const SOL_PRICE_USD = 200; 
-
-  const handleNext = () => {
-    if (!amount) return;
-    const valUsd = Number(amount) * SOL_PRICE_USD;
-    
-    // Logic: If > $100, go to double confirm
-    if (valUsd > 100) {
-        setStep("double-confirm");
-    } else {
-        setStep("confirm");
-    }
+  const handleClose = () => {
+    setStage('idle');
+    setTxHash('');
+    setAmount('');
+    setStatusMsg('');
+    onClose();
   };
 
-  const executeDonation = async () => {
-    const wallet = wallets.find((w) => w.address === user?.wallet?.address);
-    if (!wallet) return;
+  const handleDonate = async () => {
+    if (!amount || parseFloat(amount) <= 0) return;
 
     setLoading(true);
+    setTxHash('');
+    setStatusMsg('');
+
     try {
-      let tx;
-      const amountNum = Number(amount);
+      const amtNum = parseFloat(amount);
+      let signature = '';
 
-      if (isPool) {
-        // Use the Swap logic for Pool (SOL -> USDC -> Pool)
-        tx = await buildSwapAndDonateTx(new PublicKey(wallet.address), amountNum);
-      } else {
-        // Direct Transfer (SOL -> NGO Wallet directly)
-        // You need to update `lib/solana/client.ts` to expose `buildDonateTx` which does a simple SystemProgram.transfer
-        // We will assume `recipientAddress` is a valid public key
-        tx = await buildDonateTx(new PublicKey(wallet.address), amountNum, new PublicKey(recipientAddress));
-      }
-      
-      // Serialize and Send
-      let serializedTx: Uint8Array;
-      if (tx instanceof VersionedTransaction) {
-        serializedTx = tx.serialize();
-      } else {
-        serializedTx = (tx as Transaction).serializeMessage();
+      // ============================================
+      // SOLANA: SOL or USDC Transfer
+      // ============================================
+      if (currency === 'SOL' || currency === 'USDC_SOL') {
+        if (!publicKey || !signTransaction) {
+          throw new Error('Please connect your Phantom wallet first.');
+        }
+
+        setStage('confirming');
+        setStatusMsg('Building transaction...');
+
+        const toPubkey = new PublicKey(recipientAddress);
+
+        const tx =
+          currency === 'SOL'
+            ? await buildDirectSolTransfer(publicKey, amtNum, toPubkey)
+            : await buildUSDCTransferTx(publicKey, amtNum, toPubkey);
+
+        setStatusMsg('Please approve in Phantom...');
+
+        const signed = await signTransaction(tx);
+        const sig = await connection.sendRawTransaction(signed.serialize());
+
+        setStatusMsg('Confirming transaction...');
+        await connection.confirmTransaction(sig, 'confirmed');
+
+        signature = sig;
       }
 
-      await signAndSendTransaction({ transaction: serializedTx, wallet: wallet as any });
-      alert("Donation sent successfully!");
-      onClose();
-    } catch (e: any) {
-      console.error(e);
-      alert("Transaction failed: " + e.message);
+      // ============================================
+      // ETHEREUM: CCTP Bridge (Sepolia USDC -> Solana)
+      // ============================================
+      else if (currency === 'ETH') {
+        if (!ethAddress || !publicClient) {
+          throw new Error('Please connect your Ethereum wallet first.');
+        }
+
+        // Destination: User's Solana wallet or the recipient directly
+        const destSolAddress = publicKey?.toBase58() || recipientAddress;
+
+        setStage('confirming');
+        setStatusMsg('Approving USDC spend...');
+
+        // Step 1: Approve
+        const approveHash = await sendTransactionAsync({
+          to: SEPOLIA_USDC,
+          data: buildApproveData(amtNum),
+        });
+
+        setStatusMsg('Waiting for approval confirmation...');
+
+        // Actually wait for the approval to be mined
+        await publicClient.waitForTransactionReceipt({
+          hash: approveHash,
+          confirmations: 1,
+        });
+
+        setStatusMsg('Approval confirmed! Burning USDC for bridge...');
+
+        // Step 2: Burn (depositForBurn)
+        const burnHash = await sendTransactionAsync({
+          to: SEPOLIA_TOKEN_MESSENGER,
+          data: buildBurnData(amtNum, destSolAddress),
+        });
+
+        setTxHash(burnHash);
+        setStage('bridging');
+        setStatusMsg('Waiting for Circle attestation...');
+
+        await pollForAttestation(burnHash);
+
+        setStatusMsg('Bridge complete!');
+        signature = burnHash;
+      }
+
+      setTxHash(signature);
+      setStage('success');
+    } catch (e: unknown) {
+      console.error('Donation Error:', e);
+      const msg = e instanceof Error ? e.message : 'Transaction failed';
+
+      if (
+        msg.toLowerCase().includes('rejected') ||
+        msg.toLowerCase().includes('denied')
+      ) {
+        alert('Transaction cancelled by user.');
+      } else {
+        alert('Error: ' + msg);
+      }
+
+      setStage('idle');
     } finally {
       setLoading(false);
-      setStep("input");
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-      <div className="bg-[#11131F] border border-white/10 w-full max-w-md rounded-2xl p-6 shadow-2xl relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X size={20} /></button>
+  // ============================================
+  // SUCCESS SCREEN
+  // ============================================
+  if (stage === 'success') {
+    const explorerUrl =
+      currency === 'ETH'
+        ? `https://sepolia.etherscan.io/tx/${txHash}`
+        : `https://explorer.solana.com/tx/${txHash}?cluster=devnet`;
 
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-3 bg-[#14F195]/10 rounded-full text-[#14F195]"><Coins size={24} /></div>
+    return (
+      <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
+        <div className="w-full max-w-md rounded-2xl border border-[#14F195]/30 bg-[#11131F] p-8 text-center">
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#14F195]/10">
+            <CheckCircle2 size={40} className="text-[#14F195]" />
+          </div>
+          <h2 className="mb-2 text-2xl font-bold text-white">Donation Sent!</h2>
+          <p className="mb-6 text-gray-400">
+            {currency === 'ETH'
+              ? 'USDC bridged from Sepolia to Solana via Circle CCTP.'
+              : `${currency === 'SOL' ? 'SOL' : 'USDC'} transferred on Solana Devnet.`}
+          </p>
+          <div className="mb-6 rounded-xl border border-white/10 bg-black/50 p-4 text-left">
+            <p className="mb-1 text-[10px] font-bold uppercase text-gray-500">
+              Transaction Hash
+            </p>
+            <div className="flex items-center justify-between">
+              <code className="max-w-[250px] truncate font-mono text-xs text-[#14F195]">
+                {txHash}
+              </code>
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-gray-400 hover:text-white"
+              >
+                <ExternalLink size={14} />
+              </a>
+            </div>
+          </div>
+          <Button
+            onClick={handleClose}
+            className="w-full bg-[#14F195] font-bold text-black"
+          >
+            Close
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================
+  // MAIN MODAL
+  // ============================================
+  const needsSol = currency === 'SOL' || currency === 'USDC_SOL';
+  const needsEth = currency === 'ETH';
+  const canSubmit =
+    amount &&
+    parseFloat(amount) > 0 &&
+    !loading &&
+    ((needsSol && solConnected && publicKey) || (needsEth && ethConnected));
+
+  return (
+    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+      <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#11131F] p-6 shadow-2xl">
+        {/* Header */}
+        <div className="mb-6 flex items-start justify-between">
           <div>
             <h3 className="text-xl font-bold text-white">
-                {isPool ? "Donate to Regional Pool" : "Direct Transfer"}
+              Donate to {recipientName}
             </h3>
-            <p className="text-sm text-gray-400">Recipient: <span className="text-white">{recipientName}</span></p>
+            <p className="mt-1 font-mono text-xs text-blue-400">
+              Via Circle CCTP & Solana
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="text-gray-500 hover:text-white"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Currency Tabs */}
+        <div className="mb-4 flex gap-2 rounded-lg bg-black p-1">
+          {(['USDC_SOL', 'SOL', 'ETH'] as Currency[]).map((c) => (
+            <button
+              key={c}
+              onClick={() => setCurrency(c)}
+              className={clsx(
+                'flex-1 rounded-md py-2 text-xs font-bold transition-colors',
+                currency === c
+                  ? c === 'ETH'
+                    ? 'bg-purple-500 text-white'
+                    : c === 'SOL'
+                      ? 'bg-[#14F195] text-black'
+                      : 'bg-[#2775CA] text-white'
+                  : 'text-gray-500 hover:text-white'
+              )}
+            >
+              {c === 'USDC_SOL' ? 'USDC (Sol)' : c === 'ETH' ? 'ETH→Sol' : 'SOL'}
+            </button>
+          ))}
+        </div>
+
+        {/* Wallet Connection Warnings */}
+        {needsSol && !solConnected && (
+          <div
+            onClick={() => setSolModalVisible(true)}
+            className="mb-4 flex cursor-pointer gap-3 rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3"
+          >
+            <AlertTriangle className="shrink-0 text-yellow-400" size={16} />
+            <div>
+              <p className="text-xs font-medium text-yellow-200">
+                Phantom wallet not connected
+              </p>
+              <p className="text-[10px] text-yellow-200/70">
+                Click here to connect
+              </p>
+            </div>
+          </div>
+        )}
+
+        {needsEth && !ethConnected && (
+          <div
+            onClick={() => ethConnect({ connector: injected() })}
+            className="mb-4 flex cursor-pointer gap-3 rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3"
+          >
+            <AlertTriangle className="shrink-0 text-yellow-400" size={16} />
+            <div>
+              <p className="text-xs font-medium text-yellow-200">
+                Ethereum wallet not connected
+              </p>
+              <p className="text-[10px] text-yellow-200/70">
+                Click here to connect MetaMask
+              </p>
+            </div>
+          </div>
+        )}
+
+        {currency === 'ETH' && ethConnected && (
+          <div className="mb-4 flex gap-3 rounded-lg border border-purple-500/20 bg-purple-500/10 p-3">
+            <ArrowRightLeft className="shrink-0 text-purple-400" size={16} />
+            <p className="text-[10px] text-purple-200">
+              Bridging <b>USDC</b> from Sepolia → Solana Devnet via Circle CCTP.
+              Requires Sepolia USDC + ETH for gas.
+            </p>
+          </div>
+        )}
+
+        {/* Amount Input */}
+        <div className="mb-6">
+          <div className="relative">
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              min="0"
+              step="0.01"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-4 font-mono text-2xl text-white outline-none transition-colors focus:border-[#14F195]"
+            />
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">
+              {currency === 'SOL' ? 'SOL' : 'USDC'}
+            </div>
           </div>
         </div>
 
-        {step === "input" && (
-            <div className="space-y-4">
-                <div>
-                    <label className="text-sm text-gray-300 mb-1 block">Amount (SOL)</label>
-                    <input 
-                        type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0.00" autoFocus
-                        className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white text-lg font-mono outline-none focus:border-[#14F195]"
-                    />
-                    <p className="text-xs text-gray-500 mt-2 text-right">≈ ${(Number(amount || 0) * SOL_PRICE_USD).toFixed(2)} USD</p>
-                </div>
-                <Button onClick={handleNext} className="w-full py-4 bg-[#14F195] text-black font-bold">Review Donation</Button>
-            </div>
-        )}
+        {/* Submit Button */}
+        <Button
+          onClick={handleDonate}
+          disabled={!canSubmit}
+          className={clsx(
+            'w-full py-6 text-lg font-bold text-white transition-all',
+            currency === 'ETH'
+              ? 'bg-purple-600 hover:bg-purple-500'
+              : 'bg-[#2775CA] hover:bg-[#2775CA]/90',
+            !canSubmit && 'cursor-not-allowed opacity-50'
+          )}
+        >
+          {loading ? (
+            <span className="flex flex-col items-center gap-1">
+              <span className="flex items-center gap-2">
+                <Loader2 className="animate-spin" size={18} />
+                Processing...
+              </span>
+              {statusMsg && (
+                <span className="text-[10px] font-normal opacity-80">
+                  {statusMsg}
+                </span>
+              )}
+            </span>
+          ) : (
+            <span className="flex items-center justify-center gap-2">
+              {currency === 'ETH' ? 'Bridge via CCTP' : 'Donate Now'}
+              {currency === 'ETH' && <ArrowRightLeft size={16} />}
+            </span>
+          )}
+        </Button>
 
-        {step === "confirm" && (
-             <div className="space-y-4 text-center">
-                <p className="text-gray-300">Sending <span className="text-[#14F195] font-bold">{amount} SOL</span> to {recipientName}.</p>
-                <div className="flex gap-3">
-                    <Button variant="ghost" onClick={() => setStep("input")} className="flex-1">Back</Button>
-                    <Button onClick={executeDonation} disabled={loading} className="flex-1 bg-[#14F195] text-black font-bold">
-                        {loading ? <Loader2 className="animate-spin" /> : "Confirm"}
-                    </Button>
-                </div>
-             </div>
-        )}
-
-        {step === "double-confirm" && (
-            <div className="space-y-4 bg-red-500/10 p-4 rounded-xl border border-red-500/20 text-center">
-                <AlertOctagon className="w-10 h-10 text-red-500 mx-auto" />
-                <h4 className="text-lg font-bold text-red-500">Large Amount Warning</h4>
-                <p className="text-sm text-gray-300">
-                    You are about to donate <b>{amount} SOL</b> (~${(Number(amount) * SOL_PRICE_USD).toFixed(2)}). 
-                    This is a large transaction.
-                </p>
-                <p className="text-xs text-gray-500">Please confirm you verify the recipient address: {recipientAddress.slice(0, 6)}...{recipientAddress.slice(-4)}</p>
-                
-                <div className="flex gap-3 mt-4">
-                    <Button variant="ghost" onClick={() => setStep("input")} className="flex-1">Cancel</Button>
-                    <Button onClick={executeDonation} disabled={loading} className="flex-1 bg-red-500 text-white font-bold hover:bg-red-600">
-                        {loading ? <Loader2 className="animate-spin" /> : "I am sure"}
-                    </Button>
-                </div>
-            </div>
-        )}
+        {/* Connected Wallets Info */}
+        <div className="mt-4 flex justify-center gap-4 text-[10px] text-gray-500">
+          {solConnected && publicKey && (
+            <span>
+              SOL: {publicKey.toBase58().slice(0, 4)}...
+              {publicKey.toBase58().slice(-4)}
+            </span>
+          )}
+          {ethConnected && ethAddress && (
+            <span>
+              ETH: {ethAddress.slice(0, 4)}...{ethAddress.slice(-4)}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

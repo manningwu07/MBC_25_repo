@@ -66,7 +66,7 @@ export default function HomePage() {
             >
               <span className="w-2 h-2 rounded-full bg-[#14F195] animate-pulse" />
               <span className="text-sm font-medium text-gray-300">
-                Global Conflicts & Aid Needs (Powered by Polymarket Data)
+                Global Conflicts & Aid Needs
               </span>
             </motion.div>
 

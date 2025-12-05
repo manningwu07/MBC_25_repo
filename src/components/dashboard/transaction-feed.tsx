@@ -15,9 +15,7 @@ interface Tx {
 const POOL_NAMES = [
     "Ukraine Crisis Fund",
     "Gaza Relief Wallet",
-    "Sudan Emergency",
-    "Global Clean Water",
-    "Turkey Earthquake Relief"
+    "Sudan Emergency"
 ];
 
 export function TransactionFeed() {
@@ -29,7 +27,7 @@ export function TransactionFeed() {
     useEffect(() => {
         const interval = setInterval(() => {
             const randomPool = POOL_NAMES[Math.floor(Math.random() * POOL_NAMES.length)];
-            const randomAmount = (Math.random() * 15).toFixed(2);
+            const randomAmount = (Math.random() * 30).toFixed(2);
             
             const newTx = {
                 id: Math.random().toString(),
@@ -45,9 +43,6 @@ export function TransactionFeed() {
 
     return (
          <div className="bg-[#050505] border border-white/10 rounded-3xl p-6 h-full overflow-hidden flex flex-col">
-            <h3 className="text-gray-400 text-sm font-semibold mb-4 uppercase tracking-wider">
-                Live On-Chain Activity
-            </h3>
             <div className="space-y-4">
                 <AnimatePresence>
                     {txs.map((tx) => (
@@ -68,7 +63,7 @@ export function TransactionFeed() {
                                 </div>
                             </div>
                             <div className="text-right">
-                                <p className="font-mono text-[#14F195] font-bold">+{tx.amount} SOL</p>
+                                <p className="font-mono text-[#14F195] font-bold">+{tx.amount} USDC</p>
                                 <p className="text-[10px] text-gray-600">{tx.time}</p>
                             </div>
                         </motion.div>
