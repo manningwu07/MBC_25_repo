@@ -14,15 +14,13 @@ import {
   PublicKey,
   LAMPORTS_PER_SOL,
   SystemProgram,
+  TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
 
 // Create a connection to the Solana blockchain
 const connection = new Connection("https://api.devnet.solana.com");
-
-// Set to the PDA of the smartcontract
-const donationWallet = "HC8Pn99stsnYoAn2hwf5LxVxepVdwvap3mXabyca3skD";
 
 // Tutorial reccommended. 
 // CAIP-2 format for Solana
@@ -99,14 +97,49 @@ export const GET = async (req: Request) => {
 const prepareTransaction = async (
   connection: Connection,
   payer: PublicKey,
-  receiver: PublicKey,
-  amount: number
+  poolId: number,
+  amountSol: number
 ) => {
-  // Create a transfer instruction
-  const instruction = SystemProgram.transfer({
-    fromPubkey: payer,
-    toPubkey: new PublicKey(receiver),
-    lamports: amount * LAMPORTS_PER_SOL,
+  // We will call the program instruction `donate_to_pool` using the IDL
+  // Read program id from the local idl file and use the instruction discriminator
+  const idl = await import("../../../../lib/solana/solana_aid.json");
+
+  const programId = new PublicKey(idl.address);
+
+  // Find the instruction description for donate_to_pool in the idl
+  const instr = idl.instructions.find((i: any) => i.name === "donate_to_pool");
+  if (!instr) throw new Error("donate_to_pool instruction not found in IDL");
+
+  // discriminator is provided in the idl as an array of u8
+  const discriminator = Buffer.from(instr.discriminator);
+
+  // amount is u64 in the program: convert SOL -> lamports and encode as u64 LE
+  const lamports = BigInt(Math.floor(amountSol * LAMPORTS_PER_SOL));
+  const amountBuf = Buffer.alloc(8);
+  amountBuf.writeBigUInt64LE(lamports, 0);
+
+  // instruction data = <8-byte discriminator> + serialized args (here only u64 amount)
+  const data = Buffer.concat([discriminator, amountBuf]);
+
+  // pool PDA: seeds ["pool", poolId as u64 le]
+  const poolIdBuf = Buffer.alloc(8);
+  poolIdBuf.writeBigUInt64LE(BigInt(poolId), 0);
+  const [poolPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("pool"), poolIdBuf],
+    programId
+  );
+
+  // Build instruction keys according to idl accounts order
+  const keys = [
+    { pubkey: payer, isSigner: true, isWritable: true },
+    { pubkey: poolPda, isSigner: false, isWritable: true },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+  ];
+
+  const instruction = new TransactionInstruction({
+    keys,
+    programId,
+    data,
   });
 
   // Get the latest blockhash
@@ -136,15 +169,10 @@ export const POST = async (req: Request) => {
     const request: ActionPostRequest = await req.json();
     const payer = new PublicKey(request.account);
 
-    // Receiver of the donation wallet address
-    const receiver = new PublicKey(donationWallet);
+    // We call donate_to_pool for pool id 0 (matches example Anchor code)
+    const poolId = 0;
 
-    const transaction = await prepareTransaction(
-      connection,
-      payer,
-      receiver,
-      amount
-    );
+    const transaction = await prepareTransaction(connection, payer, poolId, amount);
 
     const response: ActionPostResponse = {
       type: "transaction",
