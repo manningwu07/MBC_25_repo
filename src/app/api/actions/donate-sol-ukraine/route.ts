@@ -1,4 +1,4 @@
-//file: src/app/api/actions/donate-sol/route.ts
+//file: src/app/api/actions/donate-sol-ukraine/route.ts
 
 import {
   ActionGetResponse,
@@ -45,11 +45,11 @@ export const GET = async (req: Request) => {
   // This JSON is used to render the Blink UI
   const response: ActionGetResponse = {
     type: "action",
-    icon: `${new URL("/donate.jpg", req.url).toString()}`,
+    icon: `${new URL("/ukraine.jpg", req.url).toString()}`,
     label: "1 SOL",
-    title: "Donate SOL",
+    title: "Donate to Ukraine",
     description:
-      "This Blink demonstrates how to donate SOL on the Solana blockchain. It is a part of the official Blink Starter Guides by Dialect Labs.",
+      "Donate to Ukraine Humanitarian Fund",
     // Links is used if you have multiple actions or if you need more than one params
     links: {
       actions: [
@@ -58,22 +58,22 @@ export const GET = async (req: Request) => {
           type: "transaction",
           label: "0.01 SOL",
           // This is the endpoint for the POST request
-          href: `/api/actions/donate-sol?amount=0.01`,
+          href: `/api/actions/donate-sol-ukraine?amount=0.01`,
         },
         {
           type: "transaction",
           label: "0.05 SOL",
-          href: `/api/actions/donate-sol?amount=0.05`,
+          href: `/api/actions/donate-sol-ukraine?amount=0.05`,
         },
         {
           type: "transaction",
           label: "0.1 SOL",
-          href: `/api/actions/donate-sol?amount=0.1`,
+          href: `/api/actions/donate-sol-ukraine?amount=0.1`,
         },
         {
           // Example for a custom input field
           type: "transaction",
-          href: `/api/actions/donate-sol?amount={amount}`,
+          href: `/api/actions/donate-sol-ukraine?amount={amount}`,
           label: "Donate",
           parameters: [
             {
