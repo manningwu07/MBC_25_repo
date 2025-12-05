@@ -9,8 +9,7 @@ import { Zap, Maximize2, Minimize2, Wallet, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { CAUSES, Cause } from '~/lib/causes'; // NEW IMPORT
 import { DonationModal } from '~/components/ui/donation-modal';
-
-import { getPoolById, PoolInfo } from '~/lib/solana/pools';
+import { usePool } from '~/lib/hooks/usePools';
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
@@ -29,49 +28,13 @@ export function LiveMap({ activeCauseId }: LiveMapProps) {
 	const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 	const [isExpanded, setIsExpanded] = useState(false);
 
-	const [poolInfo, setPoolInfo] = useState<PoolInfo | null>(null);
-	const [isLoadingPool, setIsLoadingPool] = useState(false);
-
 	// Modal State
 	const [modalOpen, setModalOpen] = useState(false);
 	const [selectedCause, setSelectedCause] = useState<Cause | null>(null);
 
-	useEffect(() => {
-		// no cause selected → clear pool info
-		if (!selectedCause) {
-			setPoolInfo(null);
-			return;
-		}
-
-		// map cause to pool id
-		const poolId = selectedCause.poolId;
-
-		let cancelled = false;
-
-		(async () => {
-			try {
-				setIsLoadingPool(true);
-				const info = await getPoolById(poolId);
-
-				if (!cancelled) {
-					setPoolInfo(info);
-				}
-			} catch (err) {
-				console.error('Failed to load pool info', err);
-				if (!cancelled) {
-					setPoolInfo(null);
-				}
-			} finally {
-				if (!cancelled) {
-					setIsLoadingPool(false);
-				}
-			}
-		})();
-
-		return () => {
-			cancelled = true;
-		};
-	}, [selectedCause]);
+	const { data: poolInfo, isLoading: isLoadingPool } = usePool(
+		selectedCause?.poolId ?? -1
+	);
 
 	// Resize Logic
 	useEffect(() => {
@@ -169,7 +132,7 @@ export function LiveMap({ activeCauseId }: LiveMapProps) {
 						onClick={() => setModalOpen(true)}
 						className="w-full py-3 bg-[#2775CA] hover:bg-[#2775CA]/90 text-white font-bold rounded-lg transition-all text-sm shadow-[0_0_15px_rgba(39,117,202,0.4)] flex items-center justify-center gap-2"
 					>
-						<Wallet size={16} /> Donate USDC
+						<Wallet size={16} /> Donate
 					</button>
 				</div>
 			)}

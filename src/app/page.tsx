@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { MainNav } from '~/components/layout/main-nav';
 import { Ticker } from '~/components/ui/ticker';
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
-import { getAllPools, PoolInfo } from '~/lib/solana/pools';
+import { usePools } from '~/lib/hooks/usePools';
 
 // Static Configuration for the UI Cards
 const FEATURED_FUNDS = [
@@ -34,23 +33,7 @@ const FEATURED_FUNDS = [
 ];
 
 export default function HomePage() {
-  const [pools, setPools] = useState<PoolInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchPools = async () => {
-      try {
-        const data = await getAllPools();
-        setPools(data);
-      } catch (e) {
-        console.error("Failed to fetch pools", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchPools();
-  }, []);
+  const { data: pools = [], isLoading: loading } = usePools();
 
   return (
     <div className="min-h-screen bg-[#020410] text-white flex flex-col font-sans selection:bg-[#14F195] selection:text-black">
@@ -200,7 +183,7 @@ export default function HomePage() {
                           {balance} <span className="text-xs text-gray-500 font-normal">SOL</span>
                         </p>
                       )}
-                      <p className="font-mono text-[10px] text-gray-500 truncate max-w-[80px]">
+                      <p className="font-mono text-[10px] text-gray-500 truncate max-w-20">
                         {fund.walletPlaceholder}
                       </p>
                     </div>

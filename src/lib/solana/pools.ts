@@ -1,9 +1,15 @@
 import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
-import { PublicKey, Connection, clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import {
+  PublicKey,
+  Connection,
+  clusterApiUrl,
+  LAMPORTS_PER_SOL,
+} from '@solana/web3.js';
 import { SolanaAid } from './solana_aid';
 import idl from './solana_aid.json';
 
 const DEVNET_RPC = process.env.NEXT_PUBLIC_RPC_URL || clusterApiUrl('devnet');
+const POOL_IDS = [0, 1, 2];
 
 export interface PoolInfo {
   id: number;
@@ -21,82 +27,67 @@ export const POOL_NAMES: Record<number, string> = {
   2: 'Sudan Displacement Support',
 };
 
-/**
- * Get pool info by ID
- */
-export async function getPoolById(poolId: number): Promise<PoolInfo | null> {
-  try {
-    const connection = new Connection(DEVNET_RPC, 'confirmed');
-    const programId = new PublicKey(idl.address);
-
-    const [poolPda] = PublicKey.findProgramAddressSync(
+function getPoolPdas(programId: PublicKey): PublicKey[] {
+  return POOL_IDS.map((poolId) => {
+    const [pda] = PublicKey.findProgramAddressSync(
       [Buffer.from('pool'), new BN(poolId).toArrayLike(Buffer, 'le', 8)],
       programId
     );
+    return pda;
+  });
+}
 
-    const accountInfo = await connection.getAccountInfo(poolPda);
+/**
+ * Batch fetch ALL pools in a single RPC call
+ */
+export async function getAllPools(): Promise<PoolInfo[]> {
+  const connection = new Connection(DEVNET_RPC, 'confirmed');
+  const programId = new PublicKey(idl.address);
+  const poolPdas = getPoolPdas(programId);
 
-    if (!accountInfo) {
-      return null;
-    }
+  const accounts = await connection.getMultipleAccountsInfo(poolPdas);
 
-    // Decode account data
-    const program = new Program(
-      idl as never,
-      new AnchorProvider(connection, {} as never, { commitment: 'confirmed' })
-    ) as unknown as Program<SolanaAid>;
+  const program = new Program(
+    idl as never,
+    new AnchorProvider(connection, {} as never, { commitment: 'confirmed' })
+  ) as unknown as Program<SolanaAid>;
 
-    const decoded = program.coder.accounts.decode('pool', accountInfo.data);
+  const pools: PoolInfo[] = [];
 
-    // Get actual lamport balance of the PDA
-    const balanceLamports = accountInfo.lamports;
+  accounts.forEach((account, index) => {
+    if (!account) return;
 
-    return {
+    const decoded = program.coder.accounts.decode('pool', account.data);
+    const poolId = POOL_IDS[index];
+
+    pools.push({
       id: decoded.id.toNumber(),
       name: decoded.name || POOL_NAMES[poolId] || `Pool ${poolId}`,
       totalDonated: decoded.totalDonated,
       totalWithdrawn: decoded.totalWithdrawn,
       isActive: decoded.isActive,
-      balanceLamports,
-      balanceSol: balanceLamports / LAMPORTS_PER_SOL,
-    };
-  } catch (error) {
-    console.error('Error fetching pool info:', error);
-    return null;
-  }
+      balanceLamports: account.lamports,
+      balanceSol: account.lamports / LAMPORTS_PER_SOL,
+    });
+  });
+
+  return pools;
 }
 
 /**
- * Get all pools that an NGO has access to
+ * Get single pool from batch fetch
+ */
+export async function getPoolById(poolId: number): Promise<PoolInfo | null> {
+  const pools = await getAllPools();
+  return pools.find((p) => p.id === poolId) ?? null;
+}
+
+/**
+ * Get pools for specific IDs
  */
 export async function getPoolsForNgo(
   allowedPoolIds: number[]
 ): Promise<PoolInfo[]> {
-  const pools: PoolInfo[] = [];
-
-  for (const poolId of allowedPoolIds) {
-    const pool = await getPoolById(poolId);
-    if (pool) {
-      pools.push(pool);
-    }
-  }
-
-  return pools;
-}
-
-/**
- * Get all pools (for display purposes)
- */
-export async function getAllPools(): Promise<PoolInfo[]> {
-  const poolIds = [0, 1, 2]; // Known pool IDs
-  const pools: PoolInfo[] = [];
-
-  for (const poolId of poolIds) {
-    const pool = await getPoolById(poolId);
-    if (pool) {
-      pools.push(pool);
-    }
-  }
-
-  return pools;
+  const pools = await getAllPools();
+  return pools.filter((p) => allowedPoolIds.includes(p.id));
 }
