@@ -2,7 +2,6 @@
 'use client';
 
 import { MainNav } from '~/components/layout/main-nav';
-import { Zap, Globe2, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function About() {
@@ -72,8 +71,7 @@ export default function About() {
           >
             <h2 className="text-3xl font-bold">Our Solution</h2>
             <p className="text-gray-400 leading-relaxed">
-              We use Polymarket as a data oracle to identify high-need zones,
-              Solana to settle payments in sub-seconds, and smart contracts to
+              We use Solana to settle payments in sub-seconds, and smart contracts to
               whitelist NGOs and cap withdrawal limits.
             </p>
             <div className="p-6 bg-[#14F195]/5 border border-[#14F195]/20 rounded-xl">
@@ -86,57 +84,8 @@ export default function About() {
             </div>
           </motion.div>
         </div>
-
-        <h3 className="text-2xl font-bold mb-8 text-center">Powered By</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <TechCard
-            icon={<Zap className="text-[#14F195]" />}
-            title="Solana & Circle"
-            desc="USDC on Solana ensures funds hold value and move instantly, globally."
-            delay={0.02}
-          />
-          <TechCard
-            icon={<Globe2 className="text-blue-400" />}
-            title="Polymarket Oracle"
-            desc="Prediction market data signals urgency and verifies narratives."
-            delay={0.06}
-          />
-          <TechCard
-            icon={<Lock className="text-[#9945FF]" />}
-            title="Privy Auth"
-            desc="Seamless onboarding via email or wallet with secure custody options."
-            delay={0.1}
-          />
-        </div>
       </motion.section>
     </div>
   );
 }
 
-function TechCard({
-  icon,
-  title,
-  desc,
-  delay = 0,
-}: {
-  icon: any;
-  title: string;
-  desc: string;
-  delay?: number;
-}) {
-  return (
-    <motion.div
-      className="p-6 bg-[#11131F] border border-white/5 rounded-2xl hover:border-white/10 transition-colors group"
-      initial={{ opacity: 0, y: 8 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.3 }}
-      transition={{ duration: 0.35, ease: 'easeOut', delay }}
-    >
-      <div className="mb-4 p-3 bg-white/5 w-fit rounded-lg group-hover:scale-110 transition-transform">
-        {icon}
-      </div>
-      <h4 className="text-lg font-bold mb-2">{title}</h4>
-      <p className="text-sm text-gray-400 leading-relaxed">{desc}</p>
-    </motion.div>
-  );
-}

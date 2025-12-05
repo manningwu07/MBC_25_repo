@@ -27,7 +27,7 @@ export function TransactionFeed() {
     useEffect(() => {
         const interval = setInterval(() => {
             const randomPool = POOL_NAMES[Math.floor(Math.random() * POOL_NAMES.length)];
-            const randomAmount = (Math.random() * 30).toFixed(2);
+            const randomAmount = (Math.random() * 15).toFixed(2);
             
             const newTx = {
                 id: Math.random().toString(),
@@ -63,7 +63,7 @@ export function TransactionFeed() {
                                 </div>
                             </div>
                             <div className="text-right">
-                                <p className="font-mono text-[#14F195] font-bold">+{tx.amount} USDC</p>
+                                <p className="font-mono text-[#14F195] font-bold">+{tx.amount} SOL</p>
                                 <p className="text-[10px] text-gray-600">{tx.time}</p>
                             </div>
                         </motion.div>

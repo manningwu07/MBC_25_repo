@@ -12,6 +12,8 @@ import { DonationModal } from '~/components/ui/donation-modal';
 
 import { getPoolById, PoolInfo } from '~/lib/solana/pools';
 
+const LAMPORTS_PER_SOL = 1_000_000_000;
+
 const Globe: any = dynamic(() => import('react-globe.gl'), {
 	ssr: false,
 	loading: () => <div className="w-full h-full bg-[#080808] animate-pulse flex items-center justify-center text-gray-500">Loading Circle Infrastructure...</div>
@@ -152,14 +154,14 @@ export function LiveMap({ activeCauseId }: LiveMapProps) {
 
 					<div className="flex justify-between items-center bg-white/5 p-3 rounded-lg border border-white/5 mb-4">
 						<span className="text-xs text-gray-400">
-							Raised (lamports)
+							Raised (SOL)
 						</span>
 
 						<span className="text-blue-400 font-mono font-bold">
 							{isLoadingPool
 								? '…'
 								: poolInfo
-									? poolInfo.totalDonated.toString() // BN → string
+									? (poolInfo.totalDonated.toNumber() / LAMPORTS_PER_SOL).toString() // BN → string
 									: '0'}
 						</span>
 					</div>
@@ -192,10 +194,9 @@ export function LiveMap({ activeCauseId }: LiveMapProps) {
 
 			<div className="absolute bottom-2 left-2 text-[10px] text-gray-600 font-mono pointer-events-none flex items-center gap-2">
 				<Zap size={10} className="text-[#14F195]" />
-				<span>Solana Mainnet</span>
+				<span>Solana Devnet</span>
 				<span className="w-1 h-1 bg-gray-600 rounded-full" />
 				<Zap size={10} className="text-blue-500" />
-				<span>Circle Infrastructure</span>
 			</div>
 		</div>
 	);

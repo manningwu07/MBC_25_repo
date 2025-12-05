@@ -157,10 +157,15 @@ export async function withdrawFromPool(
 
   const lamports = new BN(Math.floor(amountSol * 1e9));
 
+  // Call with explicit accounts - no system_program needed for direct lamport transfer
   const tx = await (
     program.methods as unknown as {
       withdrawFromPool: (amount: BN) => {
-        accounts: (accounts: { ngo: PublicKey; pool: PublicKey }) => {
+        accounts: (accounts: {
+          ngoWallet: PublicKey;
+          ngo: PublicKey;
+          pool: PublicKey;
+        }) => {
           rpc: () => Promise<string>;
         };
       };
@@ -168,6 +173,7 @@ export async function withdrawFromPool(
   )
     .withdrawFromPool(lamports)
     .accounts({
+      ngoWallet: wallet.publicKey,
       ngo: ngoPda,
       pool: poolPda,
     })

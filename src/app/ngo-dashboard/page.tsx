@@ -20,9 +20,8 @@ import {
   withdrawFromPool,
   NgoInfo,
 } from '~/lib/solana/donate';
-import { getPoolById, PoolInfo, POOL_NAMES } from '~/lib/solana/pools';
+import { getPoolById, PoolInfo } from '~/lib/solana/pools';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { BN } from '@coral-xyz/anchor';
 
 export default function NgoDashboard() {
   const { publicKey, connected, signTransaction, signAllTransactions } =
