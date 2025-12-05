@@ -21,7 +21,7 @@ export interface ContractTransaction {
 
 // Convert CAUSES to Contract State
 const INITIAL_CONTRACTS: FundContract[] = CAUSES.map(c => ({
-  id: c.id,
+  id: String(c.id),
   name: c.name,
   address: c.wallet_address,
   balance: c.usdc_raised,

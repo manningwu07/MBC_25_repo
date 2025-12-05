@@ -9,7 +9,7 @@ import { useState } from "react";
 import { CAUSES } from "~/lib/causes";
 
 export default function CausesPage() {
-    const [activeId, setActiveId] = useState<string | null>(CAUSES[0].id);
+    const [activeId, setActiveId] = useState<string | null>(CAUSES[0]?.id ?? null);
 
     return (
         <div className="min-h-screen bg-[#020410] text-white flex flex-col">
