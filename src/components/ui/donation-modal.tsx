@@ -1,74 +1,108 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   X,
   Loader2,
-  ArrowRightLeft,
   CheckCircle2,
   ExternalLink,
   AlertTriangle,
+  Info,
 } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { clsx } from 'clsx';
-import { PublicKey } from '@solana/web3.js';
+import { donateToPool } from '~/lib/solana/donate';
 
 // Solana
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 
-// Ethereum
-import { useAccount, useConnect, useSendTransaction, usePublicClient } from 'wagmi';
+// Ethereum - wagmi v3
+import {
+  useAccount,
+  useConnect,
+  useSendTransaction,
+  useWaitForTransactionReceipt,
+} from 'wagmi';
+import { parseEther } from 'viem';
 import { injected } from 'wagmi/connectors';
-
-// Local
-import {
-  buildUSDCTransferTx,
-  buildDirectSolTransfer,
-} from '~/lib/solana/client';
-import {
-  buildApproveData,
-  buildBurnData,
-  SEPOLIA_USDC,
-  SEPOLIA_TOKEN_MESSENGER,
-  pollForAttestation,
-} from '~/lib/circle';
 
 interface DonationModalProps {
   isOpen: boolean;
   onClose: () => void;
   recipientName: string;
-  recipientAddress: string;
-  causeId?: string;
+  poolId: number;
 }
 
-type Currency = 'SOL' | 'ETH' | 'USDC_SOL';
+type Currency = 'SOL' | 'ETH';
+
+const ETH_TREASURY = '0xadf16E45c5e5F5716CEC24b38D0194B1a4cf4B64' as const; 
 
 export function DonationModal({
   isOpen,
   onClose,
   recipientName,
-  recipientAddress,
+  poolId,
 }: DonationModalProps) {
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<Currency>('SOL');
-  const [loading, setLoading] = useState(false);
-  const [stage, setStage] = useState<
-    'idle' | 'bridging' | 'confirming' | 'success'
-  >('idle');
+  const [stage, setStage] = useState<'idle' | 'confirming' | 'success'>(
+    'idle'
+  );
   const [txHash, setTxHash] = useState<string>('');
   const [statusMsg, setStatusMsg] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Solana
-  const { publicKey, signTransaction, connected: solConnected } = useWallet();
-  const { connection } = useConnection();
+  const {
+    publicKey,
+    signTransaction,
+    signAllTransactions,
+    connected: solConnected,
+  } = useWallet();
   const { setVisible: setSolModalVisible } = useWalletModal();
 
-  // Ethereum
+  // Ethereum - wagmi v3
   const { address: ethAddress, isConnected: ethConnected } = useAccount();
-  const { connect: ethConnect } = useConnect();
-  const { sendTransactionAsync } = useSendTransaction();
-  const publicClient = usePublicClient();
+  const { connect } = useConnect();
+  const {
+    sendTransaction,
+    isPending: isEthPending,
+    data: ethTxHash,
+    error: ethError,
+    reset: resetEthTx,
+  } = useSendTransaction();
+
+  // Wait for ETH transaction receipt
+  const { isLoading: isEthConfirming, isSuccess: isEthConfirmed } =
+    useWaitForTransactionReceipt({
+      hash: ethTxHash,
+    });
+
+  // Handle ETH transaction success
+  useEffect(() => {
+    if (isEthConfirmed && ethTxHash && stage === 'confirming') {
+      setTxHash(ethTxHash);
+      setStage('success');
+      setIsProcessing(false);
+    }
+  }, [isEthConfirmed, ethTxHash, stage]);
+
+  // Handle ETH transaction error
+  useEffect(() => {
+    if (ethError) {
+      console.error('ETH Transaction Error:', ethError);
+      setStage('idle');
+      setIsProcessing(false);
+      alert(
+        'Transaction failed: ' +
+          (ethError.message.includes('rejected')
+            ? 'Transaction rejected by user'
+            : ethError.message)
+      );
+      resetEthTx();
+    }
+  }, [ethError, resetEthTx]);
 
   if (!isOpen) return null;
 
@@ -77,97 +111,66 @@ export function DonationModal({
     setTxHash('');
     setAmount('');
     setStatusMsg('');
+    setIsProcessing(false);
+    resetEthTx();
     onClose();
   };
 
   const handleDonate = async () => {
     if (!amount || parseFloat(amount) <= 0) return;
 
-    setLoading(true);
-    setTxHash('');
     setStatusMsg('');
+    setIsProcessing(true);
 
     try {
       const amtNum = parseFloat(amount);
-      let signature = '';
 
       // ============================================
-      // SOLANA: SOL or USDC Transfer
+      // SOLANA: SOL Donation to Pool via Smart Contract
       // ============================================
-      if (currency === 'SOL' || currency === 'USDC_SOL') {
-        if (!publicKey || !signTransaction) {
+      if (currency === 'SOL') {
+        if (!publicKey || !signTransaction || !signAllTransactions) {
           throw new Error('Please connect your Phantom wallet first.');
         }
 
         setStage('confirming');
-        setStatusMsg('Building transaction...');
+        setStatusMsg('Please approve the transaction in your wallet...');
 
-        const toPubkey = new PublicKey(recipientAddress);
+        const sig = await donateToPool(
+          {
+            publicKey,
+            signTransaction,
+            signAllTransactions,
+          },
+          poolId,
+          amtNum
+        );
 
-        const tx =
-          currency === 'SOL'
-            ? await buildDirectSolTransfer(publicKey, amtNum, toPubkey)
-            : await buildUSDCTransferTx(publicKey, amtNum, toPubkey);
-
-        setStatusMsg('Please approve in Phantom...');
-
-        const signed = await signTransaction(tx);
-        const sig = await connection.sendRawTransaction(signed.serialize());
-
-        setStatusMsg('Confirming transaction...');
-        await connection.confirmTransaction(sig, 'confirmed');
-
-        signature = sig;
+        setStatusMsg('Transaction confirmed!');
+        setTxHash(sig);
+        setStage('success');
+        setIsProcessing(false);
       }
-
       // ============================================
-      // ETHEREUM: CCTP Bridge (Sepolia USDC -> Solana)
+      // ETHEREUM: Send ETH to treasury for conversion
+      // In production: Backend would swap ETH→SOL and call smart contract
       // ============================================
       else if (currency === 'ETH') {
-        if (!ethAddress || !publicClient) {
+        if (!ethAddress) {
           throw new Error('Please connect your Ethereum wallet first.');
         }
 
-        // Destination: User's Solana wallet or the recipient directly
-        const destSolAddress = publicKey?.toBase58() || recipientAddress;
-
         setStage('confirming');
-        setStatusMsg('Approving USDC spend...');
+        setStatusMsg(
+          'Please approve the transaction (ETH will be converted to SOL)'
+        );
 
-        // Step 1: Approve
-        const approveHash = await sendTransactionAsync({
-          to: SEPOLIA_USDC,
-          data: buildApproveData(amtNum),
+        // Send ETH to treasury - in production this triggers a swap
+        sendTransaction({
+          to: ETH_TREASURY,
+          value: parseEther(amtNum.toString()),
         });
-
-        setStatusMsg('Waiting for approval confirmation...');
-
-        // Actually wait for the approval to be mined
-        await publicClient.waitForTransactionReceipt({
-          hash: approveHash,
-          confirmations: 1,
-        });
-
-        setStatusMsg('Approval confirmed! Burning USDC for bridge...');
-
-        // Step 2: Burn (depositForBurn)
-        const burnHash = await sendTransactionAsync({
-          to: SEPOLIA_TOKEN_MESSENGER,
-          data: buildBurnData(amtNum, destSolAddress),
-        });
-
-        setTxHash(burnHash);
-        setStage('bridging');
-        setStatusMsg('Waiting for Circle attestation...');
-
-        await pollForAttestation(burnHash);
-
-        setStatusMsg('Bridge complete!');
-        signature = burnHash;
       }
-
-      setTxHash(signature);
-      setStage('success');
     } catch (e: unknown) {
       console.error('Donation Error:', e);
       const msg = e instanceof Error ? e.message : 'Transaction failed';
@@ -182,8 +185,7 @@ export function DonationModal({
       }
 
       setStage('idle');
-    } finally {
-      setLoading(false);
+      setIsProcessing(false);
     }
   };
 
@@ -205,8 +207,8 @@ export function DonationModal({
           <h2 className="mb-2 text-2xl font-bold text-white">Donation Sent!</h2>
           <p className="mb-6 text-gray-400">
             {currency === 'ETH'
-              ? 'USDC bridged from Sepolia to Solana via Circle CCTP.'
-              : `${currency === 'SOL' ? 'SOL' : 'USDC'} transferred on Solana Devnet.`}
+              ? 'ETH received! It will be converted to SOL and deposited to the relief pool.'
+              : 'SOL deposited to the relief pool on Solana Devnet.'}
           </p>
           <div className="mb-6 rounded-xl border border-white/10 bg-black/50 p-4 text-left">
             <p className="mb-1 text-[10px] font-bold uppercase text-gray-500">
@@ -240,12 +242,14 @@ export function DonationModal({
   // ============================================
   // MAIN MODAL
   // ============================================
-  const needsSol = currency === 'SOL' || currency === 'USDC_SOL';
+  const needsSol = currency === 'SOL';
   const needsEth = currency === 'ETH';
+  const isLoading = isProcessing || isEthPending || isEthConfirming;
   const canSubmit =
     amount &&
     parseFloat(amount) > 0 &&
-    !loading &&
+    !isLoading &&
+    stage === 'idle' &&
     ((needsSol && solConnected && publicKey) || (needsEth && ethConnected));
 
   return (
@@ -258,7 +262,7 @@ export function DonationModal({
               Donate to {recipientName}
             </h3>
             <p className="mt-1 font-mono text-xs text-blue-400">
-              Via Circle CCTP & Solana
+              Pool #{poolId} • Solana Devnet
             </p>
           </div>
           <button
@@ -271,22 +275,22 @@ export function DonationModal({
 
         {/* Currency Tabs */}
         <div className="mb-4 flex gap-2 rounded-lg bg-black p-1">
-          {(['USDC_SOL', 'SOL', 'ETH'] as Currency[]).map((c) => (
+          {(['SOL', 'ETH'] as Currency[]).map((c) => (
             <button
               key={c}
               onClick={() => setCurrency(c)}
+              disabled={isLoading}
               className={clsx(
                 'flex-1 rounded-md py-2 text-xs font-bold transition-colors',
                 currency === c
                   ? c === 'ETH'
                     ? 'bg-purple-500 text-white'
-                    : c === 'SOL'
-                      ? 'bg-[#14F195] text-black'
-                      : 'bg-[#2775CA] text-white'
-                  : 'text-gray-500 hover:text-white'
+                    : 'bg-[#14F195] text-black'
+                  : 'text-gray-500 hover:text-white',
+                isLoading && 'cursor-not-allowed opacity-50'
               )}
             >
-              {c === 'USDC_SOL' ? 'USDC (Sol)' : c === 'ETH' ? 'ETH→Sol' : 'SOL'}
+              {c}
             </button>
           ))}
         </div>
@@ -300,10 +304,10 @@ export function DonationModal({
             <AlertTriangle className="shrink-0 text-yellow-400" size={16} />
             <div>
               <p className="text-xs font-medium text-yellow-200">
-                Phantom wallet not connected
+                Solana wallet not connected
               </p>
               <p className="text-[10px] text-yellow-200/70">
-                Click here to connect
+                Click here to connect Phantom
               </p>
             </div>
           </div>
@@ -311,7 +315,7 @@ export function DonationModal({
 
         {needsEth && !ethConnected && (
           <div
-            onClick={() => ethConnect({ connector: injected() })}
+            onClick={() => connect({ connector: injected() })}
             className="mb-4 flex cursor-pointer gap-3 rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3"
           >
             <AlertTriangle className="shrink-0 text-yellow-400" size={16} />
@@ -326,12 +330,14 @@ export function DonationModal({
           </div>
         )}
 
+        {/* ETH Conversion Info */}
         {currency === 'ETH' && ethConnected && (
           <div className="mb-4 flex gap-3 rounded-lg border border-purple-500/20 bg-purple-500/10 p-3">
-            <ArrowRightLeft className="shrink-0 text-purple-400" size={16} />
+            <Info className="shrink-0 text-purple-400" size={16} />
             <p className="text-[10px] text-purple-200">
-              Bridging <b>USDC</b> from Sepolia → Solana Devnet via Circle CCTP.
-              Requires Sepolia USDC + ETH for gas.
+              <b>Cross-chain donation:</b> Your ETH (Sepolia) will be received
+              by our treasury and converted to SOL, then deposited to the
+              relief pool smart contract.
             </p>
           </div>
         )}
@@ -346,10 +352,11 @@ export function DonationModal({
               placeholder="0.00"
               min="0"
               step="0.01"
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-4 font-mono text-2xl text-white outline-none transition-colors focus:border-[#14F195]"
+              disabled={isLoading}
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-4 font-mono text-2xl text-white outline-none transition-colors focus:border-[#14F195] disabled:cursor-not-allowed disabled:opacity-50"
             />
             <div className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">
-              {currency === 'SOL' ? 'SOL' : 'USDC'}
+              {currency}
             </div>
           </div>
         </div>
@@ -359,29 +366,30 @@ export function DonationModal({
           onClick={handleDonate}
           disabled={!canSubmit}
           className={clsx(
-            'w-full py-6 text-lg font-bold text-white transition-all',
+            'w-full py-6 text-lg font-bold transition-all',
             currency === 'ETH'
-              ? 'bg-purple-600 hover:bg-purple-500'
-              : 'bg-[#2775CA] hover:bg-[#2775CA]/90',
+              ? 'bg-purple-600 text-white hover:bg-purple-500'
+              : 'bg-[#14F195] text-black hover:bg-[#14F195]/90',
             !canSubmit && 'cursor-not-allowed opacity-50'
           )}
         >
-          {loading ? (
+          {isLoading ? (
             <span className="flex flex-col items-center gap-1">
               <span className="flex items-center gap-2">
                 <Loader2 className="animate-spin" size={18} />
-                Processing...
+                {isEthConfirming
+                  ? 'Confirming on Ethereum...'
+                  : 'Processing...'}
               </span>
               {statusMsg && (
-                <span className="text-[10px] font-normal opacity-80">
+                <span className="whitespace-pre-line text-[10px] font-normal opacity-80">
                   {statusMsg}
                 </span>
               )}
             </span>
           ) : (
             <span className="flex items-center justify-center gap-2">
-              {currency === 'ETH' ? 'Bridge via CCTP' : 'Donate Now'}
-              {currency === 'ETH' && <ArrowRightLeft size={16} />}
+              {currency === 'ETH' ? 'Donate ETH → SOL' : 'Donate SOL'}
             </span>
           )}
         </Button>

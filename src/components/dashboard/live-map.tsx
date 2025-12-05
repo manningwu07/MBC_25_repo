@@ -5,12 +5,12 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Zap, Maximize2, Minimize2, Wallet, X, Globe2 } from 'lucide-react';
+import { Zap, Maximize2, Minimize2, Wallet, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { CAUSES, Cause } from '~/lib/causes'; // NEW IMPORT
 import { DonationModal } from '~/components/ui/donation-modal';
 
-import { get_pool_by_id, PoolInfo } from '~/lib/solana/pools';
+import { getPoolById, PoolInfo } from '~/lib/solana/pools';
 
 const Globe: any = dynamic(() => import('react-globe.gl'), {
 	ssr: false,
@@ -42,14 +42,14 @@ export function LiveMap({ activeCauseId }: LiveMapProps) {
 		}
 
 		// map cause to pool id
-		const poolId = selectedCause.poolId; // or Number(selectedCause.id) / hard-code mapping
+		const poolId = selectedCause.poolId;
 
 		let cancelled = false;
 
 		(async () => {
 			try {
 				setIsLoadingPool(true);
-				const info = await get_pool_by_id(poolId);
+				const info = await getPoolById(poolId);
 
 				if (!cancelled) {
 					setPoolInfo(info);
@@ -125,15 +125,11 @@ export function LiveMap({ activeCauseId }: LiveMapProps) {
 					isOpen={modalOpen}
 					onClose={() => setModalOpen(false)}
 					recipientName={selectedCause.name}
-					recipientAddress={selectedCause.wallet_address}
-					causeId={selectedCause.id}
+					poolId={selectedCause.poolId}
 				/>
 			)}
 
 			<div className="absolute top-4 right-4 z-40 flex gap-2">
-				<div className="px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs font-bold text-blue-400 flex items-center gap-2">
-					<Globe2 size={14} /> Circle CCTP Active
-				</div>
 				<button
 					onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
 					className="p-2 bg-black/60 hover:bg-white/10 border border-white/10 rounded-lg text-white backdrop-blur-md"
@@ -163,7 +159,7 @@ export function LiveMap({ activeCauseId }: LiveMapProps) {
 							{isLoadingPool
 								? '…'
 								: poolInfo
-									? poolInfo.donated.toString() // BN → string
+									? poolInfo.totalDonated.toString() // BN → string
 									: '0'}
 						</span>
 					</div>

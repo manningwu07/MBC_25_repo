@@ -15,7 +15,7 @@ import { clusterApiUrl } from '@solana/web3.js';
 const wagmiConfig = createConfig({
   chains: [sepolia],
   transports: {
-    [sepolia.id]: http('https://rpc.sepolia.org'),
+    [sepolia.id]: http('https://ethereum-sepolia-rpc.publicnode.com'),
   },
 });
 
