@@ -12,6 +12,7 @@
       "DOM.Iterable"
     ],
     "module": "ESNext",
+    "moduleResolution": "node",
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
