@@ -70,9 +70,6 @@ export function MainNav() {
           <span className="text-lg font-bold leading-none tracking-tight text-white">
             Solana-Aid
           </span>
-          <span className="text-[10px] tracking-wider text-gray-400">
-            Powered by Circle USDC
-          </span>
         </div>
       </Link>
 
