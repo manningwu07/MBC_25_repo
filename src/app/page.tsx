@@ -1,37 +1,57 @@
 'use client';
 
-import { ArrowRight, Activity, ShieldCheck, Coins } from 'lucide-react';
+import { ArrowRight, Activity, ShieldCheck, Coins, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { MainNav } from '~/components/layout/main-nav';
 import { Ticker } from '~/components/ui/ticker';
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { getAllPools, PoolInfo } from '~/lib/solana/pools';
 
-// Mock Data for the Cards
+// Static Configuration for the UI Cards
 const FEATURED_FUNDS = [
   {
-    title: 'Ukraine Crisis Fund',
-    id: 'ukr-fund',
+    id: 0,
+    title: 'Ukraine Humanitarian Fund',
     icon: <ShieldCheck className="w-6 h-6 text-red-500" />,
-    wallet: 'SolanaWalletUkr...KiNng',
     color: 'bg-red-500/10 border-red-500/20',
+    walletPlaceholder: 'SolanaWalletUkr...KiNng'
   },
   {
-    title: 'Gaza Relief Wallet',
-    id: 'gaza-relief',
+    id: 1,
+    title: 'Gaza Emergency Relief',
     icon: <Activity className="w-6 h-6 text-emerald-500" />,
-    wallet: 'SolanaWalletGaza...2Sjt',
     color: 'bg-emerald-500/10 border-emerald-500/20',
+    walletPlaceholder: 'SolanaWalletGaza...2Sjt'
   },
   {
-    title: 'Clean Water Initiative',
-    id: 'water-dao',
+    id: 2,
+    title: 'Sudan Displacement',
     icon: <Coins className="w-6 h-6 text-blue-500" />,
-    wallet: 'SolanaWalletH2O...WvtI',
     color: 'bg-blue-500/10 border-blue-500/20',
-  },
+    walletPlaceholder: 'SolanaWalletSudan...WvtI'
+  }
 ];
 
 export default function HomePage() {
+  const [pools, setPools] = useState<PoolInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPools = async () => {
+      try {
+        const data = await getAllPools();
+        setPools(data);
+      } catch (e) {
+        console.error("Failed to fetch pools", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchPools();
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#020410] text-white flex flex-col font-sans selection:bg-[#14F195] selection:text-black">
       <MainNav />
@@ -39,7 +59,6 @@ export default function HomePage() {
       <main className="flex-1 relative flex flex-col justify-center items-center overflow-hidden">
         {/* Background Map Effect */}
         <div className="absolute inset-0 z-0 opacity-30 pointer-events-none">
-          {/* Replace this with a real static map image in public folder if available */}
           <div className="w-full h-full bg-[url('https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg')] bg-no-repeat bg-center bg-cover mix-blend-overlay opacity-20 invert" />
           <div className="absolute inset-0 bg-linear-to-t from-[#020410] via-transparent to-[#020410]" />
           <div className="absolute inset-0 bg-linear-to-r from-[#020410] via-transparent to-[#020410]" />
@@ -89,7 +108,7 @@ export default function HomePage() {
             >
               Connect with verified NGOs and specialized funds directly. Bypass
               bureaucracy and send aid where it&apos;s needed in seconds using
-              Solana & USDC.
+              Solana.
             </motion.p>
 
             <motion.div
@@ -130,7 +149,6 @@ export default function HomePage() {
               className="md:col-span-3 bg-[#11131F]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 flex flex-col justify-center items-center text-center gap-4 shadow-2xl"
             >
               <div className="flex gap-4 opacity-80">
-                {/* Placeholders for logos (RedCross, StJude, etc) */}
                 <div className="w-10 h-10 bg-white rounded-md flex items-center justify-center text-red-600 font-bold text-xs">
                   RC
                 </div>
@@ -147,32 +165,49 @@ export default function HomePage() {
               </div>
             </motion.div>
 
-            {/* Specific Funds */}
-            {FEATURED_FUNDS.map((fund) => (
-              <motion.div
-                key={fund.id}
-                variants={{
-                  hidden: { opacity: 0, y: 10 },
-                  show: {
-                    opacity: 1,
-                    y: 0,
-                    transition: { duration: 0.3, ease: 'easeOut' },
-                  },
-                }}
-                className={`md:col-span-3 bg-[#11131F]/60 backdrop-blur-md border border-white/5 rounded-3xl p-6 flex flex-col justify-between hover:bg-[#1A1D2D] transition-colors cursor-pointer group`}
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`p-3 rounded-2xl ${fund.color}`}>{fund.icon}</div>
-                  <ArrowRight className="text-gray-600 group-hover:text-white transition-colors -rotate-45 group-hover:rotate-0" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-lg mb-1">{fund.title}</h4>
-                  <p className="font-mono text-[10px] text-gray-500 truncate">
-                    {fund.wallet}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
+            {/* Specific Funds - Combined Static Meta with Live Data */}
+            {FEATURED_FUNDS.map((fund) => {
+              // Find the live balance for this pool ID
+              const livePool = pools.find(p => p.id === fund.id);
+              const balance = livePool ? livePool.balanceSol.toFixed(2) : '0.00';
+
+              return (
+                <motion.div
+                  key={fund.id}
+                  variants={{
+                    hidden: { opacity: 0, y: 10 },
+                    show: {
+                      opacity: 1,
+                      y: 0,
+                      transition: { duration: 0.3, ease: 'easeOut' },
+                    },
+                  }}
+                  className={`md:col-span-3 bg-[#11131F]/60 backdrop-blur-md border border-white/5 rounded-3xl p-6 flex flex-col justify-between hover:bg-[#1A1D2D] transition-colors cursor-pointer group`}
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div className={`p-3 rounded-2xl ${fund.color}`}>{fund.icon}</div>
+                    <ArrowRight className="text-gray-600 group-hover:text-white transition-colors -rotate-45 group-hover:rotate-0" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg mb-1">{fund.title}</h4>
+                    <div className="flex justify-between items-end">
+                      {loading ? (
+                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                          <Loader2 size={12} className="animate-spin" /> Syncing...
+                        </span>
+                      ) : (
+                        <p className="font-mono text-xl text-[#14F195] font-bold">
+                          {balance} <span className="text-xs text-gray-500 font-normal">SOL</span>
+                        </p>
+                      )}
+                      <p className="font-mono text-[10px] text-gray-500 truncate max-w-[80px]">
+                        {fund.walletPlaceholder}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
           </motion.div>
         </motion.div>
       </main>
