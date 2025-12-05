@@ -2,7 +2,6 @@
 'use client';
 
 import { MainNav } from '~/components/layout/main-nav';
-import { Zap, Globe2, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function About() {
@@ -72,8 +71,7 @@ export default function About() {
           >
             <h2 className="text-3xl font-bold">Our Solution</h2>
             <p className="text-gray-400 leading-relaxed">
-              We use Polymarket as a data oracle to identify high-need zones,
-              Solana to settle payments in sub-seconds, and smart contracts to
+              We use Solana to settle payments in sub-seconds, and smart contracts to
               whitelist NGOs and cap withdrawal limits.
             </p>
             <div className="p-6 bg-[#14F195]/5 border border-[#14F195]/20 rounded-xl">
