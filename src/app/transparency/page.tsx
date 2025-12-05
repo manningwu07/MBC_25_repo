@@ -9,12 +9,10 @@ import {
   ArrowUpRight,
   RefreshCw,
 } from 'lucide-react';
-import { useEffect, useState, useCallback } from 'react';
-import {
-  getWithdrawalTransactions,
-  getDonationTransactions,
-  WithdrawalTransaction,
-} from '~/lib/solana/transactions';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTransactions, useRefreshTransactions } from '~/lib/hooks/useTransactions';
+import { WithdrawalTransaction } from '~/lib/solana/transactions';
 import { Button } from '~/components/ui/button';
 
 type TransactionType = 'all' | 'withdrawals' | 'donations';
@@ -24,42 +22,22 @@ interface DisplayTransaction extends WithdrawalTransaction {
 }
 
 export default function Transparency() {
-  const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<TransactionType>('all');
-  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
+  const clearCache = useRefreshTransactions();
 
-  const fetchTransactions = useCallback(async () => {
-    try {
-      const [withdrawals, donations] = await Promise.all([
-        getWithdrawalTransactions(50),
-        getDonationTransactions(50),
-      ]);
+  const { data, isLoading: loading, isFetching: refreshing } = useTransactions();
 
-      const allTxs: DisplayTransaction[] = [
-        ...withdrawals.map((tx) => ({ ...tx, type: 'withdrawal' as const })),
-        ...donations.map((tx) => ({ ...tx, type: 'donation' as const })),
-      ];
-
-      // Sort by timestamp descending
-      allTxs.sort((a, b) => b.timestamp - a.timestamp);
-
-      setTransactions(allTxs);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
+  const transactions: DisplayTransaction[] = data
+    ? [
+        ...data.withdrawals.map((tx) => ({ ...tx, type: 'withdrawal' as const })),
+        ...data.donations.map((tx) => ({ ...tx, type: 'donation' as const })),
+      ].sort((a, b) => b.timestamp - a.timestamp)
+    : [];
 
   const handleRefresh = () => {
-    setRefreshing(true);
-    fetchTransactions();
+    clearCache();
+    queryClient.invalidateQueries({ queryKey: ['transactions'] });
   };
 
   const filteredTransactions = transactions.filter((tx) => {
@@ -236,6 +214,13 @@ export default function Transparency() {
             </tbody>
           </table>
         </div>
+
+        {/* Cache Info */}
+        {data && (
+          <p className="mt-4 text-xs text-gray-600">
+            Last fetched: {new Date(data.timestamp).toLocaleTimeString()}
+          </p>
+        )}
 
         {/* Info Footer */}
         <div className="mt-8 rounded-lg border border-blue-500/10 bg-blue-500/5 p-4">
