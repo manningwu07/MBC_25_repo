@@ -13,7 +13,7 @@ export const WALLETS = {
 };
 
 export interface Cause {
-  id: string;
+  id: number;
   name: string;
   description: string;
   location: { lat: number; lng: number };
@@ -24,7 +24,8 @@ export interface Cause {
 
 export const CAUSES: Cause[] = [
   {
-    id: 'ukraine-aid',
+    //id: 'ukraine-aid',
+	id: 0,
     name: 'Ukraine Humanitarian Fund',
     description:
       'Medical supplies and emergency housing for displaced families in Kyiv and Kharkiv regions.',
@@ -34,7 +35,8 @@ export const CAUSES: Cause[] = [
     tags: ['Medical', 'Housing', 'Emergency'],
   },
   {
-    id: 'gaza-relief',
+    //id: 'gaza-relief',
+	id: 1,
     name: 'Gaza Emergency Relief',
     description:
       'Direct food aid, water purification, and medical assistance for civilians.',
@@ -44,7 +46,8 @@ export const CAUSES: Cause[] = [
     tags: ['Food', 'Water', 'Medical'],
   },
   {
-    id: 'sudan-crisis',
+    //id: 'sudan-crisis',
+	id: 2,
     name: 'Sudan Displacement Support',
     description:
       'Support for families fleeing conflict zones with shelter and essential goods.',
@@ -55,6 +58,6 @@ export const CAUSES: Cause[] = [
   },
 ];
 
-export function getCauseById(id: string) {
+export function getCauseById(id: number) {
   return CAUSES.find((c) => c.id === id);
 }
