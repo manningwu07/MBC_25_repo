@@ -8,4 +8,3 @@ export interface DonationError {
 	message: string;
 	code?: number;
 }
-
