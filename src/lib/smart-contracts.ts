@@ -53,32 +53,36 @@ export const joinContract = async (contractId: string, walletAddress: string) =>
 };
 
 // Helper to withdraw (simulates 'withdraw_fund' instruction)
-export const withdrawFromContract = async (contractId: string, amount: number, requesterAddress: string, p0: string) => {
-    const contracts = getContracts();
-    const contract = contracts.find(c => c.id === contractId);
+export const withdrawFromContract = async (
+  contractId: string,
+  amount: number,
+  _contractName: string,
+  requesterAddress: string
+) => {
+  const contracts = getContracts();
+  const contract = contracts.find((c) => c.id === contractId);
 
-    if (!contract) throw new Error("Contract not found");
+  if (!contract) throw new Error('Contract not found');
 
-    // ---------------------------------------------------------
-    // RESTORED WHITELIST CHECK
-    // ---------------------------------------------------------
-    if (!contract.whitelist.includes(requesterAddress)) {
-        throw new Error(`ACCESS DENIED: Wallet ${requesterAddress.slice(0,6)}... is not whitelisted for ${contract.name}`);
-    }
+  if (!contract.whitelist.includes(requesterAddress)) {
+    throw new Error(
+      `ACCESS DENIED: Wallet ${requesterAddress.slice(0, 6)}... is not whitelisted for ${contract.name}`
+    );
+  }
 
-    if (amount > contract.balance) throw new Error("Insufficient funds in smart contract");
+  if (amount > contract.balance)
+    throw new Error('Insufficient funds in smart contract');
 
-    // Perform Update
-    const updated = contracts.map(c => {
-        if (c.id === contractId) return { ...c, balance: c.balance - amount };
-        return c;
-    });
+  const updated = contracts.map((c) => {
+    if (c.id === contractId) return { ...c, balance: c.balance - amount };
+    return c;
+  });
 
-    recordTransaction(contractId, contract.name, amount, requesterAddress);
+  recordTransaction(contractId, contract.name, amount, requesterAddress);
 
-    localStorage.setItem('mock_contracts_state', JSON.stringify(updated));
-    await new Promise(r => setTimeout(r, 1000)); // Simulate RPC delay
-    return true;
+  localStorage.setItem('mock_contracts_state', JSON.stringify(updated));
+  await new Promise((r) => setTimeout(r, 1000));
+  return true;
 };
 
 // Transactions:

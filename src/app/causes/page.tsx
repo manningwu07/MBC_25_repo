@@ -56,7 +56,7 @@ export default function CausesPage() {
 
                         <div className="mt-8 pt-8 border-t border-white/5">
                              <h3 className="text-sm font-bold text-gray-400 uppercase mb-4">Recent On-Chain Activity</h3>
-                             <div className="h-[300px] overflow-hidden rounded-xl border border-white/5 relative">
+                             <div className="h-[200px] overflow-hidden rounded-xl border border-white/5 relative">
                                 <TransactionFeed />
                              </div>
                         </div>
