@@ -18,14 +18,20 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 
 // Ethereum
-import { useAccount, useConnect, useSendTransaction, usePublicClient } from 'wagmi';
+import {
+  useAccount,
+  useConnect,
+  useSendTransaction,
+  usePublicClient,
+} from 'wagmi';
 import { injected } from 'wagmi/connectors';
 
 // Local
 import {
   buildUSDCTransferTx,
-  buildDirectSolTransfer,
+  buildDonateToPoolTx,
 } from '~/lib/solana/client';
+import { getCauseById } from '~/lib/causes';
 import {
   buildApproveData,
   buildBurnData,
@@ -39,16 +45,17 @@ interface DonationModalProps {
   onClose: () => void;
   recipientName: string;
   recipientAddress: string;
-  causeId?: string;
+  causeId: string; // Required now!
 }
 
-type Currency = 'SOL' | 'ETH' | 'USDC_SOL';
+type Currency = 'SOL' | 'ETH'; //| 'USDC_SOL';
 
 export function DonationModal({
   isOpen,
   onClose,
   recipientName,
   recipientAddress,
+  causeId,
 }: DonationModalProps) {
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<Currency>('SOL');
@@ -69,6 +76,9 @@ export function DonationModal({
   const { connect: ethConnect } = useConnect();
   const { sendTransactionAsync } = useSendTransaction();
   const publicClient = usePublicClient();
+
+  // Get the cause to find poolId
+  const cause = getCauseById(causeId);
 
   if (!isOpen) return null;
 
@@ -92,33 +102,58 @@ export function DonationModal({
       let signature = '';
 
       // ============================================
-      // SOLANA: SOL or USDC Transfer
+      // SOLANA: SOL donation via Smart Contract
       // ============================================
-      if (currency === 'SOL' || currency === 'USDC_SOL') {
+      if (currency === 'SOL') {
         if (!publicKey || !signTransaction) {
           throw new Error('Please connect your Phantom wallet first.');
         }
 
+        if (!cause) {
+          throw new Error('Invalid cause selected.');
+        }
+
         setStage('confirming');
-        setStatusMsg('Building transaction...');
+        setStatusMsg('Building smart contract transaction...');
 
-        const toPubkey = new PublicKey(recipientAddress);
-
-        const tx =
-          currency === 'SOL'
-            ? await buildDirectSolTransfer(publicKey, amtNum, toPubkey)
-            : await buildUSDCTransferTx(publicKey, amtNum, toPubkey);
+        // Use the smart contract!
+        const tx = await buildDonateToPoolTx(publicKey, cause.poolId, amtNum);
 
         setStatusMsg('Please approve in Phantom...');
 
         const signed = await signTransaction(tx);
         const sig = await connection.sendRawTransaction(signed.serialize());
 
-        setStatusMsg('Confirming transaction...');
+        setStatusMsg('Confirming on-chain...');
         await connection.confirmTransaction(sig, 'confirmed');
 
         signature = sig;
       }
+
+      // // ============================================
+      // // SOLANA: USDC Transfer (direct SPL transfer)
+      // // ============================================
+      // else if (currency === 'USDC_SOL') {
+      //   if (!publicKey || !signTransaction) {
+      //     throw new Error('Please connect your Phantom wallet first.');
+      //   }
+
+      //   setStage('confirming');
+      //   setStatusMsg('Building USDC transfer...');
+
+      //   const toPubkey = new PublicKey(recipientAddress);
+      //   const tx = await buildUSDCTransferTx(publicKey, amtNum, toPubkey);
+
+      //   setStatusMsg('Please approve in Phantom...');
+
+      //   const signed = await signTransaction(tx);
+      //   const sig = await connection.sendRawTransaction(signed.serialize());
+
+      //   setStatusMsg('Confirming transaction...');
+      //   await connection.confirmTransaction(sig, 'confirmed');
+
+      //   signature = sig;
+      // }
 
       // ============================================
       // ETHEREUM: CCTP Bridge (Sepolia USDC -> Solana)
@@ -128,13 +163,11 @@ export function DonationModal({
           throw new Error('Please connect your Ethereum wallet first.');
         }
 
-        // Destination: User's Solana wallet or the recipient directly
         const destSolAddress = publicKey?.toBase58() || recipientAddress;
 
         setStage('confirming');
         setStatusMsg('Approving USDC spend...');
 
-        // Step 1: Approve
         const approveHash = await sendTransactionAsync({
           to: SEPOLIA_USDC,
           data: buildApproveData(amtNum),
@@ -142,15 +175,10 @@ export function DonationModal({
 
         setStatusMsg('Waiting for approval confirmation...');
 
-        // Actually wait for the approval to be mined
-        await publicClient.waitForTransactionReceipt({
-          hash: approveHash,
-          confirmations: 1,
-        });
+        await waitForTx(publicClient, approveHash, setStatusMsg);
 
         setStatusMsg('Approval confirmed! Burning USDC for bridge...');
 
-        // Step 2: Burn (depositForBurn)
         const burnHash = await sendTransactionAsync({
           to: SEPOLIA_TOKEN_MESSENGER,
           data: buildBurnData(amtNum, destSolAddress),
@@ -206,7 +234,9 @@ export function DonationModal({
           <p className="mb-6 text-gray-400">
             {currency === 'ETH'
               ? 'USDC bridged from Sepolia to Solana via Circle CCTP.'
-              : `${currency === 'SOL' ? 'SOL' : 'USDC'} transferred on Solana Devnet.`}
+              : currency === 'SOL'
+                ? 'SOL donated to pool via Solana smart contract.'
+                : 'USDC transferred on Solana Devnet.'}
           </p>
           <div className="mb-6 rounded-xl border border-white/10 bg-black/50 p-4 text-left">
             <p className="mb-1 text-[10px] font-bold uppercase text-gray-500">
@@ -226,6 +256,16 @@ export function DonationModal({
               </a>
             </div>
           </div>
+          {currency === 'SOL' && cause && (
+            <div className="mb-4 rounded-lg border border-[#14F195]/20 bg-[#14F195]/5 p-3 text-left">
+              <p className="text-[10px] font-bold uppercase text-[#14F195]">
+                Pool Updated
+              </p>
+              <p className="text-xs text-gray-400">
+                Pool #{cause.poolId} total_donated incremented on-chain
+              </p>
+            </div>
+          )}
           <Button
             onClick={handleClose}
             className="w-full bg-[#14F195] font-bold text-black"
@@ -240,7 +280,7 @@ export function DonationModal({
   // ============================================
   // MAIN MODAL
   // ============================================
-  const needsSol = currency === 'SOL' || currency === 'USDC_SOL';
+  const needsSol = currency === 'SOL';  //|| currency === 'USDC_SOL';
   const needsEth = currency === 'ETH';
   const canSubmit =
     amount &&
@@ -258,7 +298,9 @@ export function DonationModal({
               Donate to {recipientName}
             </h3>
             <p className="mt-1 font-mono text-xs text-blue-400">
-              Via Circle CCTP & Solana
+              {currency === 'SOL' && cause
+                ? `Pool #${cause.poolId} • Solana Smart Contract`
+                : 'Via Circle CCTP & Solana'}
             </p>
           </div>
           <button
@@ -271,7 +313,8 @@ export function DonationModal({
 
         {/* Currency Tabs */}
         <div className="mb-4 flex gap-2 rounded-lg bg-black p-1">
-          {(['USDC_SOL', 'SOL', 'ETH'] as Currency[]).map((c) => (
+          {/* {(['SOL', 'USDC_SOL', 'ETH'] as Currency[]).map((c) => ( */}
+          {(['SOL', 'ETH'] as Currency[]).map((c) => (
             <button
               key={c}
               onClick={() => setCurrency(c)}
@@ -286,10 +329,22 @@ export function DonationModal({
                   : 'text-gray-500 hover:text-white'
               )}
             >
-              {c === 'USDC_SOL' ? 'USDC (Sol)' : c === 'ETH' ? 'ETH→Sol' : 'SOL'}
+              {/* {c === 'USDC_SOL' ? 'USDC (Sol)' : c === 'ETH' ? 'ETH→Sol' : 'SOL'} */}
+              {c === 'ETH' ? 'ETH→Sol' : 'SOL'}
             </button>
           ))}
         </div>
+
+        {/* Smart Contract Info for SOL */}
+        {currency === 'SOL' && cause && (
+          <div className="mb-4 flex gap-3 rounded-lg border border-[#14F195]/20 bg-[#14F195]/5 p-3">
+            <CheckCircle2 className="shrink-0 text-[#14F195]" size={16} />
+            <p className="text-[10px] text-[#14F195]">
+              Donating via <b>solana_aid</b> smart contract. Your donation will
+              be tracked on-chain in Pool #{cause.poolId}.
+            </p>
+          </div>
+        )}
 
         {/* Wallet Connection Warnings */}
         {needsSol && !solConnected && (
@@ -362,7 +417,9 @@ export function DonationModal({
             'w-full py-6 text-lg font-bold text-white transition-all',
             currency === 'ETH'
               ? 'bg-purple-600 hover:bg-purple-500'
-              : 'bg-[#2775CA] hover:bg-[#2775CA]/90',
+              : currency === 'SOL'
+                ? 'bg-[#14F195] text-black hover:bg-[#14F195]/90'
+                : 'bg-[#2775CA] hover:bg-[#2775CA]/90',
             !canSubmit && 'cursor-not-allowed opacity-50'
           )}
         >
@@ -380,7 +437,11 @@ export function DonationModal({
             </span>
           ) : (
             <span className="flex items-center justify-center gap-2">
-              {currency === 'ETH' ? 'Bridge via CCTP' : 'Donate Now'}
+              {currency === 'ETH'
+                ? 'Bridge via CCTP'
+                : currency === 'SOL'
+                  ? 'Donate to Pool'
+                  : 'Donate USDC'}
               {currency === 'ETH' && <ArrowRightLeft size={16} />}
             </span>
           )}
@@ -403,4 +464,32 @@ export function DonationModal({
       </div>
     </div>
   );
+}
+
+// Add this helper at the top of donation-modal.tsx (after imports)
+async function waitForTx(
+  publicClient: ReturnType<typeof usePublicClient>,
+  hash: `0x${string}`,
+  onStatus: (msg: string) => void,
+  maxAttempts = 30
+): Promise<void> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const receipt = await publicClient!.getTransactionReceipt({ hash });
+      if (receipt && receipt.status === 'success') {
+        return;
+      }
+      if (receipt && receipt.status === 'reverted') {
+        throw new Error('Transaction reverted');
+      }
+    } catch (e: unknown) {
+      // Receipt not found yet, keep polling
+      if (!(e instanceof Error) || !e.message.includes('could not be found')) {
+        throw e;
+      }
+    }
+    onStatus(`Confirming... (${i + 1}/${maxAttempts})`);
+    await new Promise((r) => setTimeout(r, 4000)); // 4 sec between polls
+  }
+  throw new Error('Transaction confirmation timeout');
 }
