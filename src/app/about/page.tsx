@@ -21,7 +21,7 @@ export default function About() {
           <h1 className="text-5xl md:text-6xl font-bold mb-6 tracking-tight">
             Aid at the Speed of
             <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#14F195] to-[#9945FF]">
+            <span className="text-transparent bg-clip-text bg-linear-to-r from-[#14F195] to-[#9945FF]">
               Solana.
             </span>
           </h1>
