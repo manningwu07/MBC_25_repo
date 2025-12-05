@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { Button } from '~/components/ui/button';
 import { clsx } from 'clsx';
 import Image from 'next/image';
-import { useMemo } from 'react';
 
 // Solana
 import { useWallet } from '@solana/wallet-adapter-react';
@@ -14,11 +13,6 @@ import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 // Ethereum
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { injected } from 'wagmi/connectors';
-
-interface DisplayWallet {
-  address: string;
-  chainType: 'solana' | 'ethereum';
-}
 
 export function MainNav() {
   const pathname = usePathname();
@@ -38,18 +32,7 @@ export function MainNav() {
   const { connect: ethConnect } = useConnect();
   const { disconnect: ethDisconnect } = useDisconnect();
 
-  const displayWallet = useMemo((): DisplayWallet | null => {
-    if (solConnected && publicKey) {
-      return { address: publicKey.toBase58(), chainType: 'solana' };
-    }
-    if (ethConnected && ethAddress) {
-      return { address: ethAddress, chainType: 'ethereum' };
-    }
-    return null;
-  }, [solConnected, publicKey, ethConnected, ethAddress]);
-
   const handleSolConnect = () => {
-    // Try to find Phantom wallet directly
     const phantomWallet = wallets.find(
       (w) =>
         w.adapter.name.toLowerCase().includes('phantom') &&
@@ -59,14 +42,8 @@ export function MainNav() {
     if (phantomWallet) {
       select(phantomWallet.adapter.name);
     } else {
-      // Fallback to modal
       setVisible(true);
     }
-  };
-
-  const handleDisconnect = () => {
-    if (solConnected) solDisconnect();
-    if (ethConnected) ethDisconnect();
   };
 
   const links = [
@@ -114,58 +91,53 @@ export function MainNav() {
         ))}
       </div>
 
-      <div className="flex items-center gap-3">
-        {/* Connection Status Indicators */}
-        <div className="hidden items-center gap-2 md:flex">
-          {solConnected && (
-            <div className="flex items-center gap-1.5 rounded-full bg-[#14F195]/10 px-2 py-1">
-              <span className="h-2 w-2 rounded-full bg-[#14F195]" />
-              <span className="text-[10px] font-bold text-[#14F195]">SOL</span>
-            </div>
-          )}
-          {ethConnected && (
-            <div className="flex items-center gap-1.5 rounded-full bg-purple-500/10 px-2 py-1">
-              <span className="h-2 w-2 rounded-full bg-purple-500" />
-              <span className="text-[10px] font-bold text-purple-400">ETH</span>
-            </div>
-          )}
-        </div>
-
-        {displayWallet ? (
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col text-right">
-              <span className="text-xs font-bold text-white">
-                {displayWallet.address.slice(0, 4)}..
-                {displayWallet.address.slice(-4)}
-              </span>
-              <span className="text-[10px] uppercase text-gray-400">
-                {displayWallet.chainType === 'ethereum' ? 'Sepolia' : 'Devnet'}
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              onClick={handleDisconnect}
-              className="h-9 border-white/10 text-xs hover:bg-white/5"
+      <div className="flex items-center gap-2">
+        {/* SOL Wallet */}
+        {solConnected && publicKey ? (
+          <div className="flex items-center gap-2 rounded-full border border-[#14F195]/30 bg-[#14F195]/10 px-3 py-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#14F195]" />
+            <span className="font-mono text-xs text-[#14F195]">
+              {publicKey.toBase58().slice(0, 3)}..
+              {publicKey.toBase58().slice(-2)}
+            </span>
+            <button
+              onClick={() => solDisconnect()}
+              className="ml-1 text-[10px] text-[#14F195]/60 hover:text-[#14F195]"
             >
-              Disconnect
-            </Button>
+              ✕
+            </button>
           </div>
         ) : (
-          <div className="flex gap-2">
-            <Button
-              onClick={handleSolConnect}
-              className="border-none bg-[#14F195] font-bold text-black hover:bg-[#14F195]/90"
+          <Button
+            onClick={handleSolConnect}
+            className="border-non text-xs bg-[#14F195] font-bold text-black hover:bg-[#14F195]/90"
+          >
+            Connect SOL
+          </Button>
+        )}
+
+        {/* ETH Wallet */}
+        {ethConnected && ethAddress ? (
+          <div className="flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1.5">
+            <span className="h-2 w-2 rounded-full bg-purple-500" />
+            <span className="font-mono text-xs text-purple-400">
+              {ethAddress.slice(0, 3)}..{ethAddress.slice(-2)}
+            </span>
+            <button
+              onClick={() => ethDisconnect()}
+              className="ml-1 text-[10px] text-purple-400/60 hover:text-purple-400"
             >
-              Connect SOL
-            </Button>
-            <Button
-              onClick={() => ethConnect({ connector: injected() })}
-              variant="outline"
-              className="border-white/10 text-xs hover:bg-white/5"
-            >
-              Connect ETH
-            </Button>
+              ✕
+            </button>
           </div>
+        ) : (
+          <Button
+            onClick={() => ethConnect({ connector: injected() })}
+            variant="outline"
+            className="border-purple-500/30 text-xs text-purple-400 hover:bg-purple-500/10"
+          >
+            Connect ETH
+          </Button>
         )}
       </div>
     </nav>
